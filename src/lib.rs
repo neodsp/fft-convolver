@@ -1,7 +1,9 @@
 mod fft;
 mod utilities;
-use crate::utilities::{next_power_of_2, sum, copy_and_pad, complex_multiply_accumulate, complex_size};
 use crate::fft::FFT;
+use crate::utilities::{
+    complex_multiply_accumulate, complex_size, copy_and_pad, next_power_of_2, sum,
+};
 use rustfft::num_complex::Complex;
 
 // FFTConvolver
@@ -112,10 +114,7 @@ impl FFTConvolver {
                 &impulse_response[i * self.block_size..],
                 size_copy,
             );
-            self.fft
-                .fft_forward
-                .process(&mut self.fft_buffer, &mut segment)
-                .unwrap();
+            self.fft.forward(&mut self.fft_buffer, &mut segment);
             self.segments_ir.push(segment);
         }
 
@@ -160,9 +159,7 @@ impl FFTConvolver {
             // Forward FFT
             copy_and_pad(&mut self.fft_buffer, &self.input_buffer, self.block_size);
             self.fft
-                .fft_forward
-                .process(&mut self.fft_buffer, &mut self.segments[self.current])
-                .unwrap();
+                .forward(&mut self.fft_buffer, &mut self.segments[self.current]);
 
             // complex multiplication
             if input_buffer_was_empty {
@@ -185,16 +182,7 @@ impl FFTConvolver {
             );
 
             // Backward FFT
-            self.fft
-                .fft_inverse
-                .process(&mut self.conv, &mut self.fft_buffer)
-                .unwrap();
-
-            // FFT Normalization
-            let len = self.fft_buffer.len();
-            for num in &mut self.fft_buffer {
-                *num = *num / len as f32;
-            }
+            self.fft.inverse(&mut self.conv, &mut self.fft_buffer);
 
             // Add overlap
             sum(
