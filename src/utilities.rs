@@ -17,9 +17,7 @@ pub fn complex_size(size: usize) -> usize {
 pub fn copy_and_pad(dst: &mut [f32], src: &[f32], src_size: usize) {
     assert!(dst.len() >= src_size);
     dst[0..src_size].clone_from_slice(&src[0..src_size]);
-    for i in src_size..dst.len() {
-        dst[i] = 0.;
-    }
+    dst[src_size..].iter_mut().for_each(|value| *value = 0.);
 }
 
 pub fn complex_multiply_accumulate(

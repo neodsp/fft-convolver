@@ -6,20 +6,21 @@ use crate::utilities::{
 };
 use rustfft::num_complex::Complex;
 
-// FFTConvolver
-// Implementation of a partitioned FFT convolution algorithm with uniform block size
-// Some notes on how to use it:
-// - After initialization with an impulse response, subsequent data portions of
-//   arbitrary length can be convolved. The convolver internally can handle
-//   this by using appropriate buffering.
-// - The convolver works without "latency" (except for the required
-//   processing time, of course), i.e. the output always is the convolved
-//   input for each processing call.
-//
-// - The convolver is suitable for real-time processing which means that no
-//   "unpredictable" operations like allocations, locking, API calls, etc. are
-//   performed during processing (all necessary allocations and preparations take
-//   place during initialization).
+/// FFTConvolver
+/// Implementation of a partitioned FFT convolution algorithm with uniform block size.
+///
+/// Some notes on how to use it:
+/// - After initialization with an impulse response, subsequent data portions of
+///   arbitrary length can be convolved. The convolver internally can handle
+///   this by using appropriate buffering.
+/// - The convolver works without "latency" (except for the required
+///   processing time, of course), i.e. the output always is the convolved
+///   input for each processing call.
+///
+/// - The convolver is suitable for real-time processing which means that no
+///   "unpredictable" operations like allocations, locking, API calls, etc. are
+///   performed during processing (all necessary allocations and preparations take
+///   place during initialization).
 #[derive(Debug)]
 pub struct FFTConvolver {
     ir_len: usize,
@@ -68,9 +69,13 @@ impl FFTConvolver {
     }
 
     /// Initializes the convolver
-    /// blockSize: Block size internally used by the convolver (partition size)
-    /// ir: The impulse response
-    /// returns: true: Success - false: Failed
+    ///
+    /// # Arguments
+    ///
+    /// * `block_size` - Block size internally used by the convolver (partition size)
+    ///
+    /// * `impulse_response` - The impulse response
+    ///
     pub fn init(&mut self, block_size: usize, impulse_response: &[f32]) -> bool {
         self.reset();
 
@@ -95,10 +100,10 @@ impl FFTConvolver {
         self.fft_buffer.resize(self.seg_size, 0.);
 
         // prepare segments
-        for _ in 0..self.seg_count {
-            self.segments
-                .push(vec![Complex::new(0., 0.); self.fft_complex_size]);
-        }
+        self.segments.resize(
+            self.seg_count,
+            vec![Complex::new(0., 0.); self.fft_complex_size],
+        );
 
         // prepare ir
         for i in 0..self.seg_count {
@@ -136,8 +141,11 @@ impl FFTConvolver {
     }
 
     /// Convolves the the given input samples and immediately outputs the result
-    /// input: The input samples
-    /// output: The convolution result
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input samples
+    /// * `output` - The convolution result
     pub fn process(&mut self, input: &[f32], output: &mut [f32]) {
         if self.active_seg_count == 0 {
             output.fill(0.);

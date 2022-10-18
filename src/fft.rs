@@ -37,8 +37,6 @@ impl FFT {
 
         // FFT Normalization
         let len = output.len();
-        for num in output.iter_mut() {
-            *num = *num / len as f32;
-        }
+        output.iter_mut().for_each(|bin| *bin = *bin / len as f32);
     }
 }
