@@ -125,9 +125,9 @@ impl FFTConvolver {
 
         // prepare convolution buffers
         self.pre_multiplied
-            .resize(self.fft_complex_size, Complex { re: 0., im: 0. });
+            .resize(self.fft_complex_size, Complex::new(0., 0.));
         self.conv
-            .resize(self.fft_complex_size, Complex { re: 0., im: 0. });
+            .resize(self.fft_complex_size, Complex::new(0., 0.));
         self.overlap.resize(self.block_size, 0.);
 
         // prepare input buffer
