@@ -2,9 +2,18 @@
 name = "fft-convolver"
 version = "0.1.0"
 edition = "2021"
+authors = ["Stephan Eckes <stephan@neodsp.com>"]
+description = "Audio convolution algorithm in pure Rust for real time audio processing"
+repository = "https://github.com/neodsp/fft-convolver"
+license = "MIT"
+keywords = ["audio", "filter", "convolution", "fft", "dsp"]
+categories = ["multimedia::audio"]
+readme = "README.md"
+homepage = "https://neodsp.com/"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 realfft = "3.0.1"
 rustfft = "6.0.1"
+thiserror = "1.0.37"

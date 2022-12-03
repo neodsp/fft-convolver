@@ -4,7 +4,23 @@ use crate::fft::Fft;
 use crate::utilities::{
     complex_multiply_accumulate, complex_size, copy_and_pad, next_power_of_2, sum,
 };
+use realfft::FftError;
 use rustfft::num_complex::Complex;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum FFTConvolverInitError {
+    #[error("block size is not allowed to be zero")]
+    BlockSizeZero(),
+    #[error("fft error")]
+    Fft(#[from] FftError),
+}
+
+#[derive(Error, Debug)]
+pub enum FFTConvolverProcessError {
+    #[error("fft error")]
+    Fft(#[from] FftError),
+}
 
 /// FFTConvolver
 /// Implementation of a partitioned FFT convolution algorithm with uniform block size.
@@ -76,17 +92,21 @@ impl FFTConvolver {
     ///
     /// * `impulse_response` - The impulse response
     ///
-    pub fn init(&mut self, block_size: usize, impulse_response: &[f32]) -> bool {
+    pub fn init(
+        &mut self,
+        block_size: usize,
+        impulse_response: &[f32],
+    ) -> Result<(), FFTConvolverInitError> {
         self.reset();
 
         if block_size == 0 {
-            return false;
+            return Err(FFTConvolverInitError::BlockSizeZero());
         }
 
         self.ir_len = impulse_response.len();
 
         if self.ir_len == 0 {
-            return true;
+            return Ok(());
         }
 
         self.block_size = next_power_of_2(block_size);
@@ -119,7 +139,7 @@ impl FFTConvolver {
                 &impulse_response[i * self.block_size..],
                 size_copy,
             );
-            self.fft.forward(&mut self.fft_buffer, &mut segment);
+            self.fft.forward(&mut self.fft_buffer, &mut segment)?;
             self.segments_ir.push(segment);
         }
 
@@ -137,7 +157,7 @@ impl FFTConvolver {
         // reset current position
         self.current = 0;
 
-        true
+        Ok(())
     }
 
     /// Convolves the the given input samples and immediately outputs the result
@@ -146,10 +166,14 @@ impl FFTConvolver {
     ///
     /// * `input` - The input samples
     /// * `output` - The convolution result
-    pub fn process(&mut self, input: &[f32], output: &mut [f32]) {
+    pub fn process(
+        &mut self,
+        input: &[f32],
+        output: &mut [f32],
+    ) -> Result<(), FFTConvolverProcessError> {
         if self.active_seg_count == 0 {
             output.fill(0.);
-            return;
+            return Ok(());
         }
 
         let mut processed = 0;
@@ -166,8 +190,13 @@ impl FFTConvolver {
 
             // Forward FFT
             copy_and_pad(&mut self.fft_buffer, &self.input_buffer, self.block_size);
-            self.fft
-                .forward(&mut self.fft_buffer, &mut self.segments[self.current]);
+            if let Err(err) = self
+                .fft
+                .forward(&mut self.fft_buffer, &mut self.segments[self.current])
+            {
+                output.fill(0.);
+                return Err(err.into());
+            }
 
             // complex multiplication
             if input_buffer_was_empty {
@@ -190,7 +219,10 @@ impl FFTConvolver {
             );
 
             // Backward FFT
-            self.fft.inverse(&mut self.conv, &mut self.fft_buffer);
+            if let Err(err) = self.fft.inverse(&mut self.conv, &mut self.fft_buffer) {
+                output.fill(0.);
+                return Err(err.into());
+            }
 
             // Add overlap
             sum(
@@ -218,6 +250,7 @@ impl FFTConvolver {
             }
             processed += processing;
         }
+        Ok(())
     }
 }
 
@@ -230,7 +263,7 @@ mod tests {
     fn init_test() {
         let mut convolver = FFTConvolver::default();
         let ir = vec![1., 0., 0., 0.];
-        convolver.init(10, &ir);
+        convolver.init(10, &ir).unwrap();
 
         assert_eq!(convolver.ir_len, 4);
         assert_eq!(convolver.block_size, 16);
@@ -292,11 +325,11 @@ mod tests {
     fn process_test() {
         let mut convolver = FFTConvolver::default();
         let ir = vec![1., 0., 0., 0.];
-        convolver.init(2, &ir);
+        convolver.init(2, &ir).unwrap();
 
         let input = vec![0., 1., 2., 3.];
         let mut output = vec![0.; 4];
-        convolver.process(&input, &mut output);
+        convolver.process(&input, &mut output).unwrap();
 
         for i in 0..output.len() {
             assert_eq!(input[i], output[i]);

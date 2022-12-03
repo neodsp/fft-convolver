@@ -1,4 +1,4 @@
-use realfft::{ComplexToReal, RealFftPlanner, RealToComplex};
+use realfft::{ComplexToReal, FftError, RealFftPlanner, RealToComplex};
 use rustfft::num_complex::Complex;
 use std::sync::Arc;
 
@@ -28,15 +28,18 @@ impl Fft {
         self.fft_inverse = planner.plan_fft_inverse(length);
     }
 
-    pub fn forward(&self, input: &mut [f32], output: &mut [Complex<f32>]) {
-        self.fft_forward.process(input, output).unwrap();
+    pub fn forward(&self, input: &mut [f32], output: &mut [Complex<f32>]) -> Result<(), FftError> {
+        self.fft_forward.process(input, output)?;
+        Ok(())
     }
 
-    pub fn inverse(&self, input: &mut [Complex<f32>], output: &mut [f32]) {
-        self.fft_inverse.process(input, output).unwrap();
+    pub fn inverse(&self, input: &mut [Complex<f32>], output: &mut [f32]) -> Result<(), FftError> {
+        self.fft_inverse.process(input, output)?;
 
         // FFT Normalization
         let len = output.len();
         output.iter_mut().for_each(|bin| *bin /= len as f32);
+
+        Ok(())
     }
 }
