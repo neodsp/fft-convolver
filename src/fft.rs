@@ -2,18 +2,18 @@ use realfft::{ComplexToReal, RealFftPlanner, RealToComplex};
 use rustfft::num_complex::Complex;
 use std::sync::Arc;
 
-pub struct FFT {
+pub struct Fft {
     fft_forward: Arc<dyn RealToComplex<f32>>,
     fft_inverse: Arc<dyn ComplexToReal<f32>>,
 }
 
-impl std::fmt::Debug for FFT {
+impl std::fmt::Debug for Fft {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "")
     }
 }
 
-impl FFT {
+impl Fft {
     pub fn default() -> Self {
         let mut planner = RealFftPlanner::<f32>::new();
         Self {
@@ -37,6 +37,6 @@ impl FFT {
 
         // FFT Normalization
         let len = output.len();
-        output.iter_mut().for_each(|bin| *bin = *bin / len as f32);
+        output.iter_mut().for_each(|bin| *bin /= len as f32);
     }
 }

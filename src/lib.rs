@@ -1,6 +1,6 @@
 mod fft;
 mod utilities;
-use crate::fft::FFT;
+use crate::fft::Fft;
 use crate::utilities::{
     complex_multiply_accumulate, complex_size, copy_and_pad, next_power_of_2, sum,
 };
@@ -32,7 +32,7 @@ pub struct FFTConvolver {
     segments: Vec<Vec<Complex<f32>>>,
     segments_ir: Vec<Vec<Complex<f32>>>,
     fft_buffer: Vec<f32>,
-    fft: FFT,
+    fft: Fft,
     pre_multiplied: Vec<Complex<f32>>,
     conv: Vec<Complex<f32>>,
     overlap: Vec<f32>,
@@ -53,7 +53,7 @@ impl FFTConvolver {
             segments: Vec::new(),
             segments_ir: Vec::new(),
             fft_buffer: Vec::new(),
-            fft: FFT::default(),
+            fft: Fft::default(),
             pre_multiplied: Vec::new(),
             conv: Vec::new(),
             overlap: Vec::new(),

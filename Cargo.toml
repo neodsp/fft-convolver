@@ -1,5 +1,5 @@
 [package]
-name = "fft_convolver"
+name = "fft-convolver"
 version = "0.1.0"
 edition = "2021"
 

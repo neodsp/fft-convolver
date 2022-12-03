@@ -4,7 +4,7 @@ pub fn next_power_of_2(value: usize) -> usize {
     let mut new_value = 1;
 
     while new_value < value {
-        new_value = new_value * 2;
+        new_value *= 2
     }
 
     new_value
@@ -61,32 +61,10 @@ pub fn sum(result: &mut [f32], a: &[f32], b: &[f32]) {
     }
 }
 
-pub fn interleave(input: &[f32], output: &mut [f32], num_channels: i32, buffer_size: i32) {
-    assert_eq!(input.len(), output.len());
-    for frame in 0..buffer_size {
-        for ch in 0..num_channels {
-            output[(frame * num_channels + ch) as usize] =
-                input[(ch * buffer_size + frame) as usize];
-        }
-    }
-}
-
-pub fn deinterleave(input: &[f32], output: &mut [f32], num_channels: i32, buffer_size: i32) {
-    assert_eq!(input.len(), output.len());
-    for i in (0..input.len()).step_by(num_channels as usize) {
-        for ch in 0..num_channels {
-            output[(ch as usize * buffer_size as usize + (i / num_channels as usize) as usize)] =
-                input[i + ch as usize];
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::utilities::complex_multiply_accumulate;
     use crate::utilities::copy_and_pad;
-    use crate::utilities::deinterleave;
-    use crate::utilities::interleave;
     use crate::utilities::next_power_of_2;
     use crate::utilities::sum;
     use rustfft::num_complex::Complex;
@@ -180,20 +158,5 @@ mod tests {
         assert_eq!(result[7], 8.);
         assert_eq!(result[8], 12.);
         assert_eq!(result[9], 9.);
-    }
-
-    #[test]
-    fn interleave_and_deinterleave_test() {
-        let interleaved = vec![1., 2., 3., 1., 2., 3., 1., 2., 3.];
-        let num_channels = 3;
-        let buffer_size = 3;
-        let mut result = vec![0.; 9];
-        let expected = vec![1., 1., 1., 2., 2., 2., 3., 3., 3.];
-        deinterleave(&interleaved, &mut result, num_channels, buffer_size);
-        assert_eq!(result, expected);
-
-        let mut new_result = vec![0.; 9];
-        interleave(&result, &mut new_result, num_channels, buffer_size);
-        assert_eq!(new_result, interleaved);
     }
 }
