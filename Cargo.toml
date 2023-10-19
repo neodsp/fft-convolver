@@ -1,6 +1,6 @@
 [package]
 name = "fft-convolver"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Stephan Eckes <stephan@neodsp.com>"]
 description = "Audio convolution algorithm in pure Rust for real time audio processing"
@@ -17,3 +17,4 @@ homepage = "https://neodsp.com/"
 realfft = "3.0.1"
 rustfft = "6.0.1"
 thiserror = "1.0.37"
+num = "0.4.1"

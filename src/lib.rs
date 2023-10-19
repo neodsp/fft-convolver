@@ -4,8 +4,10 @@ use crate::fft::Fft;
 use crate::utilities::{
     complex_multiply_accumulate, complex_size, copy_and_pad, next_power_of_2, sum,
 };
+use num::Zero;
 use realfft::FftError;
 use rustfft::num_complex::Complex;
+use rustfft::FftNum;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -38,47 +40,49 @@ pub enum FFTConvolverProcessError {
 ///   performed during processing (all necessary allocations and preparations take
 ///   place during initialization).
 #[derive(Debug)]
-pub struct FFTConvolver {
+pub struct FFTConvolver<F: FftNum> {
     ir_len: usize,
     block_size: usize,
     seg_size: usize,
     seg_count: usize,
     active_seg_count: usize,
     fft_complex_size: usize,
-    segments: Vec<Vec<Complex<f32>>>,
-    segments_ir: Vec<Vec<Complex<f32>>>,
-    fft_buffer: Vec<f32>,
-    fft: Fft,
-    pre_multiplied: Vec<Complex<f32>>,
-    conv: Vec<Complex<f32>>,
-    overlap: Vec<f32>,
+    segments: Vec<Vec<Complex<F>>>,
+    segments_ir: Vec<Vec<Complex<F>>>,
+    fft_buffer: Vec<F>,
+    fft: Fft<F>,
+    pre_multiplied: Vec<Complex<F>>,
+    conv: Vec<Complex<F>>,
+    overlap: Vec<F>,
     current: usize,
-    input_buffer: Vec<f32>,
+    input_buffer: Vec<F>,
     input_buffer_fill: usize,
 }
 
-impl FFTConvolver {
-    pub fn default() -> Self {
+impl<F: FftNum> Default for FFTConvolver<F> {
+    fn default() -> Self {
         Self {
-            ir_len: 0,
-            block_size: 0,
-            seg_size: 0,
-            seg_count: 0,
-            active_seg_count: 0,
-            fft_complex_size: 0,
-            segments: Vec::new(),
-            segments_ir: Vec::new(),
-            fft_buffer: Vec::new(),
-            fft: Fft::default(),
-            pre_multiplied: Vec::new(),
-            conv: Vec::new(),
-            overlap: Vec::new(),
-            current: 0,
-            input_buffer: Vec::new(),
-            input_buffer_fill: 0,
+            ir_len: Default::default(),
+            block_size: Default::default(),
+            seg_size: Default::default(),
+            seg_count: Default::default(),
+            active_seg_count: Default::default(),
+            fft_complex_size: Default::default(),
+            segments: Default::default(),
+            segments_ir: Default::default(),
+            fft_buffer: Default::default(),
+            fft: Default::default(),
+            pre_multiplied: Default::default(),
+            conv: Default::default(),
+            overlap: Default::default(),
+            current: Default::default(),
+            input_buffer: Default::default(),
+            input_buffer_fill: Default::default(),
         }
     }
+}
 
+impl<F: FftNum> FFTConvolver<F> {
     /// Resets the convolver and discards the set impulse response
     pub fn reset(&mut self) {
         *self = Self::default();
@@ -95,7 +99,7 @@ impl FFTConvolver {
     pub fn init(
         &mut self,
         block_size: usize,
-        impulse_response: &[f32],
+        impulse_response: &[F],
     ) -> Result<(), FFTConvolverInitError> {
         self.reset();
 
@@ -117,17 +121,15 @@ impl FFTConvolver {
 
         // FFT
         self.fft.init(self.seg_size);
-        self.fft_buffer.resize(self.seg_size, 0.);
+        self.fft_buffer.resize(self.seg_size, F::zero());
 
         // prepare segments
-        self.segments.resize(
-            self.seg_count,
-            vec![Complex::new(0., 0.); self.fft_complex_size],
-        );
+        self.segments
+            .resize(self.seg_count, vec![Complex::zero(); self.fft_complex_size]);
 
         // prepare ir
         for i in 0..self.seg_count {
-            let mut segment = vec![Complex::new(0., 0.); self.fft_complex_size];
+            let mut segment = vec![Complex::zero(); self.fft_complex_size];
             let remaining = self.ir_len - (i * self.block_size);
             let size_copy = if remaining >= self.block_size {
                 self.block_size
@@ -145,13 +147,12 @@ impl FFTConvolver {
 
         // prepare convolution buffers
         self.pre_multiplied
-            .resize(self.fft_complex_size, Complex::new(0., 0.));
-        self.conv
-            .resize(self.fft_complex_size, Complex::new(0., 0.));
-        self.overlap.resize(self.block_size, 0.);
+            .resize(self.fft_complex_size, Complex::zero());
+        self.conv.resize(self.fft_complex_size, Complex::zero());
+        self.overlap.resize(self.block_size, F::zero());
 
         // prepare input buffer
-        self.input_buffer.resize(self.block_size, 0.);
+        self.input_buffer.resize(self.block_size, F::zero());
         self.input_buffer_fill = 0;
 
         // reset current position
@@ -168,11 +169,11 @@ impl FFTConvolver {
     /// * `output` - The convolution result
     pub fn process(
         &mut self,
-        input: &[f32],
-        output: &mut [f32],
+        input: &[F],
+        output: &mut [F],
     ) -> Result<(), FFTConvolverProcessError> {
         if self.active_seg_count == 0 {
-            output.fill(0.);
+            output.fill(F::zero());
             return Ok(());
         }
 
@@ -194,13 +195,13 @@ impl FFTConvolver {
                 .fft
                 .forward(&mut self.fft_buffer, &mut self.segments[self.current])
             {
-                output.fill(0.);
+                output.fill(F::zero());
                 return Err(err.into());
             }
 
             // complex multiplication
             if input_buffer_was_empty {
-                self.pre_multiplied.fill(Complex { re: 0., im: 0. });
+                self.pre_multiplied.fill(Complex::zero());
                 for i in 1..self.active_seg_count {
                     let index_ir = i;
                     let index_audio = (self.current + i) % self.active_seg_count;
@@ -220,7 +221,7 @@ impl FFTConvolver {
 
             // Backward FFT
             if let Err(err) = self.fft.inverse(&mut self.conv, &mut self.fft_buffer) {
-                output.fill(0.);
+                output.fill(F::zero());
                 return Err(err.into());
             }
 
@@ -235,7 +236,7 @@ impl FFTConvolver {
             self.input_buffer_fill += processing;
             if self.input_buffer_fill == self.block_size {
                 // Input buffer is empty again now
-                self.input_buffer.fill(0.);
+                self.input_buffer.fill(F::zero());
                 self.input_buffer_fill = 0;
                 // Save the overlap
                 self.overlap

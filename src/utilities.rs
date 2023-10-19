@@ -1,4 +1,4 @@
-use rustfft::num_complex::Complex;
+use rustfft::{num_complex::Complex, FftNum};
 
 pub fn next_power_of_2(value: usize) -> usize {
     let mut new_value = 1;
@@ -14,38 +14,48 @@ pub fn complex_size(size: usize) -> usize {
     (size / 2) + 1
 }
 
-pub fn copy_and_pad(dst: &mut [f32], src: &[f32], src_size: usize) {
+pub fn copy_and_pad<F: FftNum>(dst: &mut [F], src: &[F], src_size: usize) {
     assert!(dst.len() >= src_size);
     dst[0..src_size].clone_from_slice(&src[0..src_size]);
-    dst[src_size..].iter_mut().for_each(|value| *value = 0.);
+    dst[src_size..]
+        .iter_mut()
+        .for_each(|value| *value = F::zero());
 }
 
-pub fn complex_multiply_accumulate(
-    result: &mut [Complex<f32>],
-    a: &[Complex<f32>],
-    b: &[Complex<f32>],
+pub fn complex_multiply_accumulate<F: FftNum>(
+    result: &mut [Complex<F>],
+    a: &[Complex<F>],
+    b: &[Complex<F>],
 ) {
     assert_eq!(result.len(), a.len());
     assert_eq!(result.len(), b.len());
     let len = result.len();
     let end4 = 4 * (len / 4);
     for i in (0..end4).step_by(4) {
-        result[i + 0].re += a[i + 0].re * b[i + 0].re - a[i + 0].im * b[i + 0].im;
-        result[i + 1].re += a[i + 1].re * b[i + 1].re - a[i + 1].im * b[i + 1].im;
-        result[i + 2].re += a[i + 2].re * b[i + 2].re - a[i + 2].im * b[i + 2].im;
-        result[i + 3].re += a[i + 3].re * b[i + 3].re - a[i + 3].im * b[i + 3].im;
-        result[i + 0].im += a[i + 0].re * b[i + 0].im + a[i + 0].im * b[i + 0].re;
-        result[i + 1].im += a[i + 1].re * b[i + 1].im + a[i + 1].im * b[i + 1].re;
-        result[i + 2].im += a[i + 2].re * b[i + 2].im + a[i + 2].im * b[i + 2].re;
-        result[i + 3].im += a[i + 3].re * b[i + 3].im + a[i + 3].im * b[i + 3].re;
+        result[i + 0].re =
+            result[i + 0].re + (a[i + 0].re * b[i + 0].re - a[i + 0].im * b[i + 0].im);
+        result[i + 1].re =
+            result[i + 1].re + (a[i + 1].re * b[i + 1].re - a[i + 1].im * b[i + 1].im);
+        result[i + 2].re =
+            result[i + 2].re + (a[i + 2].re * b[i + 2].re - a[i + 2].im * b[i + 2].im);
+        result[i + 3].re =
+            result[i + 3].re + (a[i + 3].re * b[i + 3].re - a[i + 3].im * b[i + 3].im);
+        result[i + 0].im =
+            result[i + 0].im + (a[i + 0].re * b[i + 0].im + a[i + 0].im * b[i + 0].re);
+        result[i + 1].im =
+            result[i + 1].im + (a[i + 1].re * b[i + 1].im + a[i + 1].im * b[i + 1].re);
+        result[i + 2].im =
+            result[i + 2].im + (a[i + 2].re * b[i + 2].im + a[i + 2].im * b[i + 2].re);
+        result[i + 3].im =
+            result[i + 3].im + (a[i + 3].re * b[i + 3].im + a[i + 3].im * b[i + 3].re);
     }
     for i in end4..len {
-        result[i].re += a[i].re * b[i].re - a[i].im * b[i].im;
-        result[i].im += a[i].re * b[i].im + a[i].im * b[i].re;
+        result[i].re = result[i].re + (a[i].re * b[i].re - a[i].im * b[i].im);
+        result[i].im = result[i].im + (a[i].re * b[i].im + a[i].im * b[i].re);
     }
 }
 
-pub fn sum(result: &mut [f32], a: &[f32], b: &[f32]) {
+pub fn sum<F: FftNum>(result: &mut [F], a: &[F], b: &[F]) {
     assert_eq!(result.len(), a.len());
     assert_eq!(result.len(), b.len());
     let len = result.len();
