@@ -1,3 +1,7 @@
+// TODO:
+// 1. adapt comments to rust style
+// 2. test the convolver
+
 use num::Zero;
 use realfft::FftError;
 use rustfft::FftNum;
@@ -30,7 +34,6 @@ pub struct TwoStageFftConvolver<F: FftNum> {
     tail_input: Vec<F>,
     tail_input_fill: usize,
     precalculated_pos: usize,
-    background_processing_input: Vec<F>,
 }
 
 impl<F: FftNum> Default for TwoStageFftConvolver<F> {
@@ -48,7 +51,6 @@ impl<F: FftNum> Default for TwoStageFftConvolver<F> {
             tail_input: Default::default(),
             tail_input_fill: Default::default(),
             precalculated_pos: Default::default(),
-            background_processing_input: Default::default(),
         }
     }
 }
@@ -213,17 +215,16 @@ impl<F: FftNum + std::cmp::PartialOrd<f64>> TwoStageFftConvolver<F> {
                     }
                 }
 
-                // convolution: 2nd-nth tail block (might be done in some background thread)
+                // convolution: 2nd-nth tail block
                 if !self.tail_precalculated.is_empty()
                     && self.tail_input_fill == self.tail_block_size
-                    && self.background_processing_input.len() == self.tail_block_size
+                    && self.tail_input.len() == self.tail_block_size
                     && self.tail_output.len() == self.tail_block_size
                 {
-                    self.wait_for_background_processsing();
                     std::mem::swap(&mut self.tail_precalculated, &mut self.tail_output);
-                    self.background_processing_input
-                        .copy_from_slice(&self.tail_input);
-                    self.start_background_processing()?;
+                    // TODO: this could be processed in a background thread
+                    self.tail_concolver
+                        .process(&self.tail_input, &mut self.tail_output)?;
                 }
 
                 if self.tail_input_fill == self.tail_block_size {
@@ -243,36 +244,5 @@ impl<F: FftNum + std::cmp::PartialOrd<f64>> TwoStageFftConvolver<F> {
      */
     pub fn reset(&mut self) {
         *self = Default::default();
-    }
-
-    /**
-     * @brief Method called by the convolver if work for background processing is available
-     *
-     * The default implementation just calls doBackgroundProcessing() to perform the "bulk"
-     * convolution. However, if you want to perform the majority of work in some background
-     * thread (which is recommended), you can overload this method and trigger the execution
-     * of doBackgroundProcessing() really in some background thread.
-     */
-    fn start_background_processing(&mut self) -> Result<(), FftConvolverError> {
-        self.do_background_processing()?;
-        Ok(())
-    }
-
-    /**
-     * @brief Called by the convolver if it expects the result of its previous call to startBackgroundProcessing()
-     *
-     * After returning from this method, all background processing has to be completed.
-     */
-    fn wait_for_background_processsing(&self) {}
-    /**
-     * @brief Actually performs the background processing work
-     */
-    fn do_background_processing(&mut self) -> Result<(), FftConvolverError> {
-        self.tail_concolver.process(
-            &self.background_processing_input[..self.tail_block_size],
-            &mut self.tail_output[..self.tail_block_size],
-        )?;
-
-        Ok(())
     }
 }

@@ -1,3 +1,9 @@
+// TODO:
+// 1. more tests for the convolver
+// 2. example that convolves a white noise with a filter, so we can see the convolution actually works
+// 3. real-time convolution example
+// 4. test that no memory get's allocated
+
 use crate::fft::Fft;
 use crate::utilities::{
     complex_multiply_accumulate, complex_size, copy_and_pad, next_power_of_2, sum,
