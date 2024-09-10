@@ -1,0 +1,21 @@
+use criterion::{criterion_group, criterion_main, Criterion};
+
+pub fn fft_convolver(c: &mut Criterion) {
+    use fft_convolver::FFTConvolver;
+
+    let mut impulse_response = vec![0_f32; 44100];
+    impulse_response[0] = 1.;
+
+    let mut convolver = FFTConvolver::default();
+    convolver.init(16, &impulse_response).unwrap();
+
+    let input = vec![0_f32; 512];
+    let mut output = vec![0_f32; 512];
+
+    c.bench_function("fft_convolver", |b| {
+        b.iter(|| convolver.process(&input, &mut output))
+    });
+}
+
+criterion_group!(benches, fft_convolver);
+criterion_main!(benches);
