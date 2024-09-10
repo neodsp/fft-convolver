@@ -1,5 +1,10 @@
+#![feature(portable_simd)]
+
 mod fft;
 mod utilities;
+use std::ops::{Add, Mul, Sub};
+use std::simd::SimdElement;
+
 use crate::fft::Fft;
 use crate::utilities::{
     complex_multiply_accumulate, complex_size, copy_and_pad, next_power_of_2, sum,
@@ -9,6 +14,9 @@ use realfft::FftError;
 use rustfft::num_complex::Complex;
 use rustfft::FftNum;
 use thiserror::Error;
+
+#[cfg(feature = "nightly_simd")]
+use std::simd::{num::SimdFloat, Simd};
 
 #[derive(Error, Debug)]
 pub enum FFTConvolverInitError {
@@ -40,7 +48,13 @@ pub enum FFTConvolverProcessError {
 ///   performed during processing (all necessary allocations and preparations take
 ///   place during initialization).
 #[derive(Debug)]
-pub struct FFTConvolver<F: FftNum> {
+pub struct FFTConvolver<F: FftNum + SimdElement>
+where
+    Simd<F, 4>: Add,
+    Simd<F, 4>: Sub,
+    Simd<F, 4>: Mul,
+    Simd<F, 4>: Mul<Output = Simd<F, 4>> + Sub<Output = Simd<F, 4>> + Add<Output = Simd<F, 4>>,
+{
     ir_len: usize,
     block_size: usize,
     seg_size: usize,
@@ -59,7 +73,13 @@ pub struct FFTConvolver<F: FftNum> {
     input_buffer_fill: usize,
 }
 
-impl<F: FftNum> Default for FFTConvolver<F> {
+impl<F: FftNum + SimdElement> Default for FFTConvolver<F>
+where
+    Simd<F, 4>: Add,
+    Simd<F, 4>: Sub,
+    Simd<F, 4>: Mul,
+    Simd<F, 4>: Mul<Output = Simd<F, 4>> + Sub<Output = Simd<F, 4>> + Add<Output = Simd<F, 4>>,
+{
     fn default() -> Self {
         Self {
             ir_len: Default::default(),
@@ -82,7 +102,13 @@ impl<F: FftNum> Default for FFTConvolver<F> {
     }
 }
 
-impl<F: FftNum> FFTConvolver<F> {
+impl<F: FftNum + SimdElement> FFTConvolver<F>
+where
+    Simd<F, 4>: Add,
+    Simd<F, 4>: Sub,
+    Simd<F, 4>: Mul,
+    Simd<F, 4>: Mul<Output = Simd<F, 4>> + Sub<Output = Simd<F, 4>> + Add<Output = Simd<F, 4>>,
+{
     /// Resets the convolver and discards the set impulse response
     pub fn reset(&mut self) {
         *self = Self::default();

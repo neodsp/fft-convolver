@@ -1,5 +1,8 @@
 use rustfft::{num_complex::Complex, FftNum};
 
+#[cfg(feature = "nightly_simd")]
+use std::simd::{num::SimdFloat, Simd, SimdElement};
+
 pub fn next_power_of_2(value: usize) -> usize {
     let mut new_value = 1;
 
@@ -22,6 +25,7 @@ pub fn copy_and_pad<F: FftNum>(dst: &mut [F], src: &[F], src_size: usize) {
         .for_each(|value| *value = F::zero());
 }
 
+#[cfg(not(feature = "nightly_simd"))]
 pub fn complex_multiply_accumulate<F: FftNum>(
     result: &mut [Complex<F>],
     a: &[Complex<F>],
@@ -50,6 +54,58 @@ pub fn complex_multiply_accumulate<F: FftNum>(
             result[i + 3].im + (a[i + 3].re * b[i + 3].im + a[i + 3].im * b[i + 3].re);
     }
     for i in end4..len {
+        result[i].re = result[i].re + (a[i].re * b[i].re - a[i].im * b[i].im);
+        result[i].im = result[i].im + (a[i].re * b[i].im + a[i].im * b[i].re);
+    }
+}
+
+use std::ops::Add;
+use std::ops::Mul;
+use std::ops::Sub;
+#[cfg(feature = "nightly_simd")]
+pub fn complex_multiply_accumulate<F: FftNum + SimdElement>(
+    result: &mut [Complex<F>],
+    a: &[Complex<F>],
+    b: &[Complex<F>],
+) where
+    Simd<F, 4>: Add,
+    Simd<F, 4>: Sub,
+    Simd<F, 4>: Mul,
+    Simd<F, 4>: Mul<Output = Simd<F, 4>> + Sub<Output = Simd<F, 4>> + Add<Output = Simd<F, 4>>,
+{
+    assert_eq!(result.len(), a.len());
+    assert_eq!(result.len(), b.len());
+
+    let len = result.len();
+    let chunk_size = 4;
+
+    // Process in chunks of 4 using SIMD
+    let end = len / chunk_size * chunk_size;
+    for i in (0..end).step_by(chunk_size) {
+        // Load values into SIMD vectors
+        let ar = Simd::from_array([a[i].re, a[i + 1].re, a[i + 2].re, a[i + 3].re]);
+        let ai = Simd::from_array([a[i].im, a[i + 1].im, a[i + 2].im, a[i + 3].im]);
+        let br = Simd::from_array([b[i].re, b[i + 1].re, b[i + 2].re, b[i + 3].re]);
+        let bi = Simd::from_array([b[i].im, b[i + 1].im, b[i + 2].im, b[i + 3].im]);
+
+        // Multiply accumulate for real part
+        let re: Simd<F, 4> = ar * br - ai * bi;
+        let re = re.to_array();
+        result[i].re = result[i].re + re[0];
+        result[i + 1].re = result[i + 1].re + re[1];
+        result[i + 2].re = result[i + 2].re + re[2];
+        result[i + 3].re = result[i + 3].re + re[3];
+
+        // Multiply accumulate for imaginary part
+        let im = ar * bi + ai * br;
+        result[i].im = result[i].im + im[0];
+        result[i + 1].im = result[i + 1].im + im[1];
+        result[i + 2].im = result[i + 2].im + im[2];
+        result[i + 3].im = result[i + 3].im + im[3];
+    }
+
+    // Process remaining elements
+    for i in end..len {
         result[i].re = result[i].re + (a[i].re * b[i].re - a[i].im * b[i].im);
         result[i].im = result[i].im + (a[i].re * b[i].im + a[i].im * b[i].re);
     }
