@@ -11,15 +11,11 @@ use rustfft::FftNum;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum FFTConvolverInitError {
+pub enum FFTConvolverError {
     #[error("block size is not allowed to be zero")]
-    BlockSizeZero(),
-    #[error("fft error")]
-    Fft(#[from] FftError),
-}
-
-#[derive(Error, Debug)]
-pub enum FFTConvolverProcessError {
+    BlockSizeZero,
+    #[error("new IR is not allowed to be longer than the old one")]
+    IRTooLong,
     #[error("fft error")]
     Fft(#[from] FftError),
 }
@@ -100,11 +96,11 @@ impl<F: FftNum> FFTConvolver<F> {
         &mut self,
         block_size: usize,
         impulse_response: &[F],
-    ) -> Result<(), FFTConvolverInitError> {
+    ) -> Result<(), FFTConvolverError> {
         self.reset();
 
         if block_size == 0 {
-            return Err(FFTConvolverInitError::BlockSizeZero());
+            return Err(FFTConvolverError::BlockSizeZero);
         }
 
         self.ir_len = impulse_response.len();
@@ -161,10 +157,10 @@ impl<F: FftNum> FFTConvolver<F> {
         Ok(())
     }
 
-    pub fn set_response(&mut self, impulse_response: &[F]) -> Result<(), FFTConvolverInitError> {
+    pub fn set_response(&mut self, impulse_response: &[F]) -> Result<(), FFTConvolverError> {
         let new_ir_len = impulse_response.len();
         if new_ir_len > self.ir_len {
-            return Err(FFTConvolverInitError::BlockSizeZero());
+            return Err(FFTConvolverError::IRTooLong);
         }
 
         if self.ir_len.is_zero() {
@@ -211,11 +207,7 @@ impl<F: FftNum> FFTConvolver<F> {
     ///
     /// * `input` - The input samples
     /// * `output` - The convolution result
-    pub fn process(
-        &mut self,
-        input: &[F],
-        output: &mut [F],
-    ) -> Result<(), FFTConvolverProcessError> {
+    pub fn process(&mut self, input: &[F], output: &mut [F]) -> Result<(), FFTConvolverError> {
         if self.active_seg_count == 0 {
             output.fill(F::zero());
             return Ok(());
