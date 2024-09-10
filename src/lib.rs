@@ -161,6 +161,50 @@ impl<F: FftNum> FFTConvolver<F> {
         Ok(())
     }
 
+    pub fn set_response(&mut self, impulse_response: &[F]) -> Result<(), FFTConvolverInitError> {
+        let new_ir_len = impulse_response.len();
+        if new_ir_len > self.ir_len {
+            return Err(FFTConvolverInitError::BlockSizeZero());
+        }
+
+        if self.ir_len.is_zero() {
+            return Ok(());
+        }
+
+        self.fft_buffer.fill(F::zero());
+        self.conv.fill(Complex::zero());
+        self.pre_multiplied.fill(Complex::zero());
+        self.overlap.fill(F::zero());
+
+        self.active_seg_count = (new_ir_len as f64 / self.block_size as f64).ceil() as usize;
+
+        // prepare ir
+        for i in 0..self.active_seg_count {
+            let segment = &mut self.segments_ir[i];
+            let remaining = new_ir_len - (i * self.block_size);
+            let size_copy = std::cmp::min(remaining, self.block_size);
+            copy_and_pad(
+                &mut self.fft_buffer,
+                &impulse_response[i * self.block_size..],
+                size_copy,
+            );
+            self.fft.forward(&mut self.fft_buffer, segment)?;
+        }
+
+        // clear remaining segments
+        for seg in &mut self.segments_ir[self.active_seg_count..self.seg_count] {
+            seg.fill(Complex::zero());
+        }
+
+        self.input_buffer.fill(F::zero());
+        self.input_buffer_fill = 0;
+
+        // reset current position
+        self.current = 0;
+
+        Ok(())
+    }
+
     /// Convolves the the given input samples and immediately outputs the result
     ///
     /// # Arguments
