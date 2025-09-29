@@ -2,6 +2,7 @@ use realfft::{ComplexToReal, FftError, RealFftPlanner, RealToComplex};
 use rustfft::{num_complex::Complex, FftNum};
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct Fft<F: FftNum> {
     fft_forward: Arc<dyn RealToComplex<F>>,
     fft_inverse: Arc<dyn ComplexToReal<F>>,
