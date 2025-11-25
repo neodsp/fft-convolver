@@ -4,11 +4,10 @@ use crate::fft::Fft;
 use crate::utilities::{
     complex_multiply_accumulate, complex_size, copy_and_pad, next_power_of_2, sum,
 };
-use num::Zero;
-use realfft::FftError;
+use realfft::num_complex::Complex;
+use realfft::num_traits::Zero;
+use realfft::{FftError, FftNum};
 use rtsan_standalone::nonblocking;
-use rustfft::FftNum;
-use rustfft::num_complex::Complex;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
