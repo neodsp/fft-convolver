@@ -11,12 +11,6 @@ pub struct Fft<F: FftNum> {
     scratch_inverse: Vec<Complex<F>>,
 }
 
-impl<F: FftNum> std::fmt::Debug for Fft<F> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "")
-    }
-}
-
 impl<F: FftNum> Default for Fft<F> {
     fn default() -> Self {
         let mut planner = RealFftPlanner::new();
