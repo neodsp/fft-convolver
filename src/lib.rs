@@ -248,6 +248,7 @@ impl<F: FftNum> FFTConvolver<F> {
     }
 
     /// Resets the current state.
+    #[nonblocking]
     pub fn reset(&mut self) {
         self.input_buffer.fill(F::zero());
         self.input_buffer_fill = 0;
