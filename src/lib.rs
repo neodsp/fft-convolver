@@ -83,11 +83,6 @@ impl<F: FftNum> Default for FFTConvolver<F> {
 }
 
 impl<F: FftNum> FFTConvolver<F> {
-    /// Resets the convolver and discards the set impulse response
-    pub fn reset(&mut self) {
-        *self = Self::default();
-    }
-
     /// Initializes the convolver
     ///
     /// # Arguments
@@ -101,8 +96,6 @@ impl<F: FftNum> FFTConvolver<F> {
         block_size: usize,
         impulse_response: &[F],
     ) -> Result<(), FFTConvolverInitError> {
-        self.reset();
-
         if block_size == 0 {
             return Err(FFTConvolverInitError::BlockSizeZero());
         }
@@ -121,13 +114,13 @@ impl<F: FftNum> FFTConvolver<F> {
 
         // FFT
         self.fft.init(self.seg_size);
-        self.fft_buffer.resize(self.seg_size, F::zero());
+        self.fft_buffer = vec![F::zero(); self.seg_size];
 
         // prepare segments
-        self.segments
-            .resize(self.seg_count, vec![Complex::zero(); self.fft_complex_size]);
+        self.segments = vec![vec![Complex::zero(); self.fft_complex_size]; self.seg_count];
 
         // prepare ir
+        self.segments_ir.clear();
         for i in 0..self.seg_count {
             let mut segment = vec![Complex::zero(); self.fft_complex_size];
             let remaining = self.ir_len - (i * self.block_size);
@@ -146,13 +139,12 @@ impl<F: FftNum> FFTConvolver<F> {
         }
 
         // prepare convolution buffers
-        self.pre_multiplied
-            .resize(self.fft_complex_size, Complex::zero());
-        self.conv.resize(self.fft_complex_size, Complex::zero());
+        self.pre_multiplied = vec![Complex::zero(); self.fft_complex_size];
+        self.conv = vec![Complex::zero(); self.fft_complex_size];
         self.overlap.resize(self.block_size, F::zero());
 
         // prepare input buffer
-        self.input_buffer.resize(self.block_size, F::zero());
+        self.input_buffer = vec![F::zero(); self.block_size];
         self.input_buffer_fill = 0;
 
         // reset current position
@@ -254,6 +246,23 @@ impl<F: FftNum> FFTConvolver<F> {
         }
         Ok(())
     }
+
+    /// Resets the current state.
+    pub fn reset(&mut self) {
+        self.input_buffer.fill(F::zero());
+        self.input_buffer_fill = 0;
+
+        self.fft_buffer.fill(F::zero());
+        for segment in &mut self.segments {
+            segment.fill(Complex::zero());
+        }
+
+        self.conv.fill(Complex::zero());
+        self.pre_multiplied.fill(Complex::zero());
+
+        self.overlap.fill(F::zero());
+        self.current = 0;
+    }
 }
 
 // Tests
@@ -336,5 +345,77 @@ mod tests {
         for i in 0..output.len() {
             assert_eq!(input[i], output[i]);
         }
+    }
+
+    #[test]
+    fn reset_test() {
+        // Create an impulse response with actual filtering characteristics
+        let ir = vec![0.5, 0.3, 0.2, 0.1];
+        let block_size = 4;
+
+        // First convolver: process data, then clear, then process again
+        let mut convolver1 = FFTConvolver::<f32>::default();
+        convolver1.init(block_size, &ir).unwrap();
+
+        // Process some data to build up history
+        let history_input = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let mut history_output = vec![0.0; 8];
+        convolver1
+            .process(&history_input, &mut history_output)
+            .unwrap();
+
+        // Clear the history
+        convolver1.reset();
+
+        // Process fresh data after clearing
+        let test_input = vec![1.0, 1.0, 1.0, 1.0];
+        let mut output1 = vec![0.0; 4];
+        convolver1.process(&test_input, &mut output1).unwrap();
+
+        // Second convolver: freshly initialized, process the same data
+        let mut convolver2 = FFTConvolver::<f32>::default();
+        convolver2.init(block_size, &ir).unwrap();
+        let mut output2 = vec![0.0; 4];
+        convolver2.process(&test_input, &mut output2).unwrap();
+
+        // The outputs should be identical if clear() truly cleared all history
+        for i in 0..output1.len() {
+            assert!(
+                (output1[i] - output2[i]).abs() < 1e-5,
+                "Mismatch at index {}: cleared convolver produced {}, fresh convolver produced {}",
+                i,
+                output1[i],
+                output2[i]
+            );
+        }
+    }
+
+    #[test]
+    fn reset_preserves_configuration() {
+        // Test that clear() preserves the convolver configuration
+        let ir = vec![0.5, 0.3, 0.2, 0.1];
+        let block_size = 4;
+
+        let mut convolver = FFTConvolver::<f32>::default();
+        convolver.init(block_size, &ir).unwrap();
+
+        let ir_len = convolver.ir_len;
+        let block_size_actual = convolver.block_size;
+        let seg_size = convolver.seg_size;
+        let seg_count = convolver.seg_count;
+
+        // Process some data
+        let input = vec![1.0, 2.0, 3.0, 4.0];
+        let mut output = vec![0.0; 4];
+        convolver.process(&input, &mut output).unwrap();
+
+        // Clear
+        convolver.reset();
+
+        // Configuration should be unchanged
+        assert_eq!(convolver.ir_len, ir_len);
+        assert_eq!(convolver.block_size, block_size_actual);
+        assert_eq!(convolver.seg_size, seg_size);
+        assert_eq!(convolver.seg_count, seg_count);
     }
 }
