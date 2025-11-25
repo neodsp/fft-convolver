@@ -40,7 +40,7 @@ pub enum FFTConvolverProcessError {
 ///   "unpredictable" operations like allocations, locking, API calls, etc. are
 ///   performed during processing (all necessary allocations and preparations take
 ///   place during initialization).
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FFTConvolver<F: FftNum> {
     ir_len: usize,
     block_size: usize,
