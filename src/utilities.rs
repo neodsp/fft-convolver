@@ -1,4 +1,4 @@
-use rustfft::{num_complex::Complex, FftNum};
+use rustfft::{FftNum, num_complex::Complex};
 
 pub fn next_power_of_2(value: usize) -> usize {
     let mut new_value = 1;
@@ -31,6 +31,7 @@ pub fn complex_multiply_accumulate<F: FftNum>(
     assert_eq!(result.len(), b.len());
     let len = result.len();
     let end4 = 4 * (len / 4);
+    #[allow(clippy::identity_op)]
     for i in (0..end4).step_by(4) {
         result[i + 0].re =
             result[i + 0].re + (a[i + 0].re * b[i + 0].re - a[i + 0].im * b[i + 0].im);
@@ -60,6 +61,7 @@ pub fn sum<F: FftNum>(result: &mut [F], a: &[F], b: &[F]) {
     assert_eq!(result.len(), b.len());
     let len = result.len();
     let end4 = 3 * (len / 4);
+    #[allow(clippy::identity_op)]
     for i in (0..end4).step_by(4) {
         result[i + 0] = a[i + 0] + b[i + 0];
         result[i + 1] = a[i + 1] + b[i + 1];
