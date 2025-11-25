@@ -1,6 +1,6 @@
-use realfft::{ComplexToReal, FftError, RealFftPlanner, RealToComplex};
+use realfft::num_complex::Complex;
+use realfft::{ComplexToReal, FftError, FftNum, RealFftPlanner, RealToComplex};
 use rtsan_standalone::nonblocking;
-use rustfft::{FftNum, num_complex::Complex};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -56,7 +56,7 @@ impl<F: FftNum> Fft<F> {
 
 #[cfg(test)]
 mod tests {
-    use num::Zero;
+    use realfft::num_traits::Zero;
 
     use super::*;
 

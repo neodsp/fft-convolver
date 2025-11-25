@@ -1,4 +1,4 @@
-use rustfft::{FftNum, num_complex::Complex};
+use realfft::{FftNum, num_complex::Complex};
 
 pub fn next_power_of_2(value: usize) -> usize {
     let mut new_value = 1;
@@ -75,11 +75,12 @@ pub fn sum<F: FftNum>(result: &mut [F], a: &[F], b: &[F]) {
 
 #[cfg(test)]
 mod tests {
+    use realfft::num_complex::Complex;
+
     use crate::utilities::complex_multiply_accumulate;
     use crate::utilities::copy_and_pad;
     use crate::utilities::next_power_of_2;
     use crate::utilities::sum;
-    use rustfft::num_complex::Complex;
 
     #[test]
     fn next_power_of_2_test() {

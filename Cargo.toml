@@ -15,7 +15,5 @@ homepage = "https://neodsp.com/"
 
 [dependencies]
 realfft = "3.5.0"
-rustfft = "6.4.1"
 thiserror = "2.0"
-num = "0.4.3"
 rtsan-standalone = "0.3.0"
