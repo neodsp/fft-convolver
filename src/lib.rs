@@ -11,15 +11,11 @@ use rtsan_standalone::nonblocking;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum FFTConvolverInitError {
+pub enum FFTConvolverError {
     #[error("block size is not allowed to be zero")]
-    BlockSizeZero(),
-    #[error("fft error")]
-    Fft(#[from] FftError),
-}
-
-#[derive(Error, Debug)]
-pub enum FFTConvolverProcessError {
+    BlockSizeZero,
+    #[error("impulse response exceeds configured capacity")]
+    ImpulseResponseExceedsCapacity,
     #[error("fft error")]
     Fft(#[from] FftError),
 }
@@ -95,9 +91,9 @@ impl<F: FftNum> FFTConvolver<F> {
         &mut self,
         block_size: usize,
         impulse_response: &[F],
-    ) -> Result<(), FFTConvolverInitError> {
+    ) -> Result<(), FFTConvolverError> {
         if block_size == 0 {
-            return Err(FFTConvolverInitError::BlockSizeZero());
+            return Err(FFTConvolverError::BlockSizeZero);
         }
 
         self.ir_len = impulse_response.len();
@@ -120,9 +116,8 @@ impl<F: FftNum> FFTConvolver<F> {
         self.segments = vec![vec![Complex::zero(); self.fft_complex_size]; self.seg_count];
 
         // prepare ir
-        self.segments_ir.clear();
-        for i in 0..self.seg_count {
-            let mut segment = vec![Complex::zero(); self.fft_complex_size];
+        self.segments_ir = vec![vec![Complex::zero(); self.fft_complex_size]; self.seg_count];
+        for (i, segment) in self.segments_ir.iter_mut().enumerate() {
             let remaining = self.ir_len - (i * self.block_size);
             let size_copy = if remaining >= self.block_size {
                 self.block_size
@@ -134,8 +129,7 @@ impl<F: FftNum> FFTConvolver<F> {
                 &impulse_response[i * self.block_size..],
                 size_copy,
             );
-            self.fft.forward(&mut self.fft_buffer, &mut segment)?;
-            self.segments_ir.push(segment);
+            self.fft.forward(&mut self.fft_buffer, segment)?;
         }
 
         // prepare convolution buffers
@@ -153,6 +147,53 @@ impl<F: FftNum> FFTConvolver<F> {
         Ok(())
     }
 
+    #[nonblocking]
+    pub fn set_response(&mut self, impulse_response: &[F]) -> Result<(), FFTConvolverError> {
+        if impulse_response.len() > self.ir_len {
+            return Err(FFTConvolverError::ImpulseResponseExceedsCapacity);
+        }
+
+        self.fft_buffer.fill(F::zero());
+        self.conv.fill(Complex::zero());
+        self.pre_multiplied.fill(Complex::zero());
+        self.overlap.fill(F::zero());
+
+        self.active_seg_count =
+            (impulse_response.len() as f64 / self.block_size as f64).ceil() as usize;
+
+        // Prepare IR
+        for (i, segment) in self
+            .segments_ir
+            .iter_mut()
+            .enumerate()
+            .take(self.active_seg_count)
+        {
+            let remaining = impulse_response.len() - (i * self.block_size);
+            let size_copy = if remaining >= self.block_size {
+                self.block_size
+            } else {
+                remaining
+            };
+            copy_and_pad(
+                &mut self.fft_buffer,
+                &impulse_response[i * self.block_size..],
+                size_copy,
+            );
+            self.fft.forward(&mut self.fft_buffer, segment)?;
+        }
+
+        // Clear remaining segments
+        for segment in self.segments_ir.iter_mut().skip(self.active_seg_count) {
+            segment.fill(Complex::zero());
+        }
+
+        self.input_buffer.fill(F::zero());
+        self.input_buffer_fill = 0;
+        self.current = 0;
+
+        Ok(())
+    }
+
     /// Convolves the the given input samples and immediately outputs the result
     ///
     /// # Arguments
@@ -160,11 +201,7 @@ impl<F: FftNum> FFTConvolver<F> {
     /// * `input` - The input samples
     /// * `output` - The convolution result
     #[nonblocking]
-    pub fn process(
-        &mut self,
-        input: &[F],
-        output: &mut [F],
-    ) -> Result<(), FFTConvolverProcessError> {
+    pub fn process(&mut self, input: &[F], output: &mut [F]) -> Result<(), FFTConvolverError> {
         if self.active_seg_count == 0 {
             output.fill(F::zero());
             return Ok(());
@@ -269,7 +306,7 @@ impl<F: FftNum> FFTConvolver<F> {
 // Tests
 #[cfg(test)]
 mod tests {
-    use crate::FFTConvolver;
+    use crate::{FFTConvolver, FFTConvolverError};
 
     #[test]
     fn init_test() {
@@ -418,5 +455,96 @@ mod tests {
         assert_eq!(convolver.block_size, block_size_actual);
         assert_eq!(convolver.seg_size, seg_size);
         assert_eq!(convolver.seg_count, seg_count);
+    }
+
+    #[test]
+    fn set_response_equals_init() {
+        // Test that set_response produces the same results as init
+        let ir1 = vec![0.5, 0.3, 0.2, 0.1];
+        let ir2 = vec![0.8, 0.6, 0.4, 0.2];
+        let block_size = 4;
+
+        // Convolver 1: Initialize with ir1, then set_response to ir2
+        let mut convolver1 = FFTConvolver::<f32>::default();
+        convolver1.init(block_size, &ir1).unwrap();
+        convolver1.set_response(&ir2).unwrap();
+
+        // Convolver 2: Initialize directly with ir2
+        let mut convolver2 = FFTConvolver::<f32>::default();
+        convolver2.init(block_size, &ir2).unwrap();
+
+        // Process the same input with both convolvers
+        let input = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let mut output1 = vec![0.0; 8];
+        let mut output2 = vec![0.0; 8];
+
+        convolver1.process(&input, &mut output1).unwrap();
+        convolver2.process(&input, &mut output2).unwrap();
+
+        // The outputs should be identical
+        for i in 0..output1.len() {
+            assert!(
+                (output1[i] - output2[i]).abs() < 1e-5,
+                "Mismatch at index {}: set_response produced {}, init produced {}",
+                i,
+                output1[i],
+                output2[i]
+            );
+        }
+    }
+
+    #[test]
+    fn set_response_with_shorter_ir() {
+        // Test that set_response works correctly with a shorter impulse response
+        let ir1 = vec![0.5, 0.3, 0.2, 0.1, 0.05, 0.02];
+        let ir2 = vec![0.8, 0.6, 0.4];
+        let block_size = 4;
+
+        // Initialize with longer IR, then set to shorter IR
+        let mut convolver1 = FFTConvolver::<f32>::default();
+        convolver1.init(block_size, &ir1).unwrap();
+        convolver1.set_response(&ir2).unwrap();
+
+        // Initialize directly with shorter IR
+        let mut convolver2 = FFTConvolver::<f32>::default();
+        convolver2.init(block_size, &ir2).unwrap();
+
+        // Process the same input
+        let input = vec![1.0, 1.0, 1.0, 1.0];
+        let mut output1 = vec![0.0; 4];
+        let mut output2 = vec![0.0; 4];
+
+        convolver1.process(&input, &mut output1).unwrap();
+        convolver2.process(&input, &mut output2).unwrap();
+
+        // The outputs should be identical
+        for i in 0..output1.len() {
+            assert!(
+                (output1[i] - output2[i]).abs() < 1e-5,
+                "Mismatch at index {}: set_response produced {}, init produced {}",
+                i,
+                output1[i],
+                output2[i]
+            );
+        }
+    }
+
+    #[test]
+    fn set_response_too_long_returns_error() {
+        // Test that set_response returns an error when IR is too long
+        let ir1 = vec![0.5, 0.3, 0.2, 0.1];
+        let ir2 = vec![0.8, 0.6, 0.4, 0.2, 0.1, 0.05];
+        let block_size = 4;
+
+        let mut convolver = FFTConvolver::<f32>::default();
+        convolver.init(block_size, &ir1).unwrap();
+
+        // Attempting to set a longer IR should fail
+        let result = convolver.set_response(&ir2);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            FFTConvolverError::ImpulseResponseExceedsCapacity
+        ));
     }
 }
