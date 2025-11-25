@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 mod fft;
 mod utilities;
 use crate::fft::Fft;
@@ -16,7 +18,7 @@ pub enum FFTConvolverError {
     BlockSizeZero,
     #[error("impulse response exceeds configured capacity")]
     ImpulseResponseExceedsCapacity,
-    #[error("fft error")]
+    #[error("error in fft: {0}")]
     Fft(#[from] FftError),
 }
 
@@ -79,14 +81,34 @@ impl<F: FftNum> Default for FFTConvolver<F> {
 }
 
 impl<F: FftNum> FFTConvolver<F> {
-    /// Initializes the convolver
+    /// Initializes the convolver with an impulse response
+    ///
+    /// This method sets up all internal buffers and prepares the convolver for processing.
+    /// The block size determines the internal partition size and affects efficiency.
+    /// It will be rounded up to the next power of 2.
+    ///
+    /// All memory allocations happen during initialization, making subsequent processing
+    /// operations real-time safe.
     ///
     /// # Arguments
     ///
-    /// * `block_size` - Block size internally used by the convolver (partition size)
+    /// * `block_size` - Block size internally used by the convolver (partition size).
+    ///   Will be rounded up to the next power of 2. Must be > 0.
+    /// * `impulse_response` - The impulse response to convolve with. Can be empty.
     ///
-    /// * `impulse_response` - The impulse response
+    /// # Returns
     ///
+    /// Returns `BlockSizeZero` if block_size is 0.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use fft_convolver::FFTConvolver;
+    ///
+    /// let mut convolver = FFTConvolver::<f32>::default();
+    /// let ir = vec![0.5, 0.3, 0.2, 0.1];
+    /// convolver.init(128, &ir).unwrap();
+    /// ```
     pub fn init(
         &mut self,
         block_size: usize,
@@ -147,6 +169,34 @@ impl<F: FftNum> FFTConvolver<F> {
         Ok(())
     }
 
+    /// Updates the impulse response without reallocating buffers
+    ///
+    /// This method allows changing the impulse response at runtime while maintaining
+    /// real-time safety by avoiding allocations. The new impulse response must not
+    /// exceed the length of the original impulse response used during initialization.
+    ///
+    /// # Arguments
+    ///
+    /// * `impulse_response` - The new impulse response (must be ≤ original length)
+    ///
+    /// # Returns
+    ///
+    /// Returns `ImpulseResponseExceedsCapacity` if the new impulse response is longer
+    /// than the original one.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use fft_convolver::FFTConvolver;
+    ///
+    /// let mut convolver = FFTConvolver::<f32>::default();
+    /// let ir1 = vec![0.5, 0.3, 0.2, 0.1];
+    /// convolver.init(4, &ir1).unwrap();
+    ///
+    /// // Update to a different impulse response of same or shorter length
+    /// let ir2 = vec![0.8, 0.6, 0.4];
+    /// convolver.set_response(&ir2).unwrap();
+    /// ```
     #[nonblocking]
     pub fn set_response(&mut self, impulse_response: &[F]) -> Result<(), FFTConvolverError> {
         if impulse_response.len() > self.ir_len {
@@ -194,12 +244,37 @@ impl<F: FftNum> FFTConvolver<F> {
         Ok(())
     }
 
-    /// Convolves the the given input samples and immediately outputs the result
+    /// Convolves the input samples with the impulse response and outputs the result
+    ///
+    /// This is a real-time safe operation that performs no allocations. The input and
+    /// output buffers can be of any length. Internal buffering handles arbitrary sizes
+    /// and ensures the output is always properly aligned with the input (zero latency
+    /// except for processing time).
+    ///
+    /// If the convolver has no active impulse response, the output is filled with zeros.
     ///
     /// # Arguments
     ///
-    /// * `input` - The input samples
-    /// * `output` - The convolution result
+    /// * `input` - The input samples to convolve
+    /// * `output` - Buffer to write the convolution result. Must have the same length as `input`.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Fft` error if an FFT operation fails.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use fft_convolver::FFTConvolver;
+    ///
+    /// let mut convolver = FFTConvolver::<f32>::default();
+    /// let ir = vec![0.5, 0.3, 0.2];
+    /// convolver.init(128, &ir).unwrap();
+    ///
+    /// let input = vec![1.0; 256];
+    /// let mut output = vec![0.0; 256];
+    /// convolver.process(&input, &mut output).unwrap();
+    /// ```
     #[nonblocking]
     pub fn process(&mut self, input: &[F], output: &mut [F]) -> Result<(), FFTConvolverError> {
         if self.active_seg_count == 0 {
@@ -284,7 +359,40 @@ impl<F: FftNum> FFTConvolver<F> {
         Ok(())
     }
 
-    /// Resets the current state.
+    /// Clears the internal processing state while preserving the impulse response
+    ///
+    /// This real-time safe operation resets all internal buffers that store the
+    /// convolution state, effectively removing any "history" or "tail" from previous
+    /// processing. The impulse response configuration remains intact, so processing
+    /// can continue immediately.
+    ///
+    /// This is useful when handling stream discontinuities such as:
+    /// - Seeking in audio playback
+    /// - Pause/resume operations with large time gaps
+    /// - Switching between different audio sources
+    ///
+    /// After calling `reset()`, the next `process()` call will produce output as if
+    /// the convolver had just been initialized.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use fft_convolver::FFTConvolver;
+    ///
+    /// let mut convolver = FFTConvolver::<f32>::default();
+    /// let ir = vec![0.5, 0.3, 0.2];
+    /// convolver.init(128, &ir).unwrap();
+    ///
+    /// let input = vec![1.0; 256];
+    /// let mut output = vec![0.0; 256];
+    /// convolver.process(&input, &mut output).unwrap();
+    ///
+    /// // Clear the state when seeking to a new position
+    /// convolver.reset();
+    ///
+    /// // Continue processing with fresh state
+    /// convolver.process(&input, &mut output).unwrap();
+    /// ```
     #[nonblocking]
     pub fn reset(&mut self) {
         self.input_buffer.fill(F::zero());
@@ -546,5 +654,53 @@ mod tests {
             result.unwrap_err(),
             FFTConvolverError::ImpulseResponseExceedsCapacity
         ));
+    }
+
+    #[test]
+    fn test_zero_latency() {
+        // Test that the algorithm has zero latency (no algorithmic delay)
+        // An impulse at input[0] should produce output starting at output[0]
+        let mut convolver = FFTConvolver::<f32>::default();
+
+        // Use a simple impulse response: just pass through with some gain
+        let ir = vec![0.5, 0.3, 0.2, 0.1];
+        convolver.init(4, &ir).unwrap();
+
+        // Send an impulse at the very first sample
+        let mut input = vec![0.0; 16];
+        input[0] = 1.0; // Impulse at position 0
+
+        let mut output = vec![0.0; 16];
+        convolver.process(&input, &mut output).unwrap();
+
+        // Check that the first output sample has the impulse response
+        // If there were latency, output[0] would be 0.0
+        assert!(
+            output[0].abs() > 0.0,
+            "Output[0] should be non-zero, indicating zero latency. Got: {}",
+            output[0]
+        );
+
+        // Verify the output matches the impulse response
+        assert!(
+            (output[0] - 0.5).abs() < 1e-5,
+            "output[0] should be 0.5, got {}",
+            output[0]
+        );
+        assert!(
+            (output[1] - 0.3).abs() < 1e-5,
+            "output[1] should be 0.3, got {}",
+            output[1]
+        );
+        assert!(
+            (output[2] - 0.2).abs() < 1e-5,
+            "output[2] should be 0.2, got {}",
+            output[2]
+        );
+        assert!(
+            (output[3] - 0.1).abs() < 1e-5,
+            "output[3] should be 0.1, got {}",
+            output[3]
+        );
     }
 }
