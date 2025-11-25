@@ -10,6 +10,7 @@ keywords = ["audio", "filter", "convolution", "fft", "dsp"]
 categories = ["multimedia::audio"]
 readme = "README.md"
 homepage = "https://neodsp.com/"
+rust-version = "1.85"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
