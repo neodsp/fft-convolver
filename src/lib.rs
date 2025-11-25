@@ -6,8 +6,9 @@ use crate::utilities::{
 };
 use num::Zero;
 use realfft::FftError;
-use rustfft::num_complex::Complex;
+use rtsan_standalone::nonblocking;
 use rustfft::FftNum;
+use rustfft::num_complex::Complex;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -167,6 +168,7 @@ impl<F: FftNum> FFTConvolver<F> {
     ///
     /// * `input` - The input samples
     /// * `output` - The convolution result
+    #[nonblocking]
     pub fn process(
         &mut self,
         input: &[F],
@@ -187,7 +189,7 @@ impl<F: FftNum> FFTConvolver<F> {
 
             let input_buffer_pos = self.input_buffer_fill;
             self.input_buffer[input_buffer_pos..input_buffer_pos + processing]
-                .clone_from_slice(&input[processed..processed + processing]);
+                .copy_from_slice(&input[processed..processed + processing]);
 
             // Forward FFT
             copy_and_pad(&mut self.fft_buffer, &self.input_buffer, self.block_size);
@@ -212,7 +214,7 @@ impl<F: FftNum> FFTConvolver<F> {
                     );
                 }
             }
-            self.conv.clone_from_slice(&self.pre_multiplied);
+            self.conv.copy_from_slice(&self.pre_multiplied);
             complex_multiply_accumulate(
                 &mut self.conv,
                 &self.segments[self.current],
@@ -240,7 +242,7 @@ impl<F: FftNum> FFTConvolver<F> {
                 self.input_buffer_fill = 0;
                 // Save the overlap
                 self.overlap
-                    .clone_from_slice(&self.fft_buffer[self.block_size..self.block_size * 2]);
+                    .copy_from_slice(&self.fft_buffer[self.block_size..self.block_size * 2]);
 
                 // Update the current segment
                 self.current = if self.current > 0 {
@@ -324,7 +326,7 @@ mod tests {
 
     #[test]
     fn process_test() {
-        let mut convolver = FFTConvolver::default();
+        let mut convolver = FFTConvolver::<f32>::default();
         let ir = vec![1., 0., 0., 0.];
         convolver.init(2, &ir).unwrap();
 
