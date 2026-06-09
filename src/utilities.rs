@@ -76,7 +76,7 @@ pub fn sum<F: FftNum>(result: &mut [F], a: &[F], b: &[F]) {
     assert_eq!(result.len(), a.len());
     assert_eq!(result.len(), b.len());
     let len = result.len();
-    let end4 = 3 * (len / 4);
+    let end4 = 4 * (len / 4);
     #[allow(clippy::identity_op)]
     for i in (0..end4).step_by(4) {
         result[i + 0] = a[i + 0] + b[i + 0];

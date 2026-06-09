@@ -287,10 +287,9 @@ impl<F: FftNum> TwoStageFFTConvolver<F> {
 
     /// Convolves the input samples with the impulse response and outputs the result
     ///
-    /// This is a real-time safe operation that performs no allocations. The input and
-    /// output buffers can be of any length. Internal buffering handles arbitrary sizes
-    /// and ensures the output is always properly aligned with the input (zero latency
-    /// except for processing time).
+    /// This is a real-time safe operation that performs no allocations. Internal buffering
+    /// handles arbitrary sizes and ensures the output is always properly aligned with the
+    /// input (zero latency except for processing time).
     ///
     /// # Arguments
     ///
@@ -299,6 +298,7 @@ impl<F: FftNum> TwoStageFFTConvolver<F> {
     ///
     /// # Returns
     ///
+    /// Returns `InputOutputLengthMismatch` if `input` and `output` have different lengths.
     /// Returns `Fft` error if an FFT operation fails.
     ///
     /// # Example
@@ -319,6 +319,9 @@ impl<F: FftNum> TwoStageFFTConvolver<F> {
     /// ```
     #[nonblocking]
     pub fn process(&mut self, input: &[F], output: &mut [F]) -> Result<(), FFTConvolverError> {
+        if input.len() != output.len() {
+            return Err(FFTConvolverError::InputOutputLengthMismatch);
+        }
         self.head_convolver.process(input, output)?;
 
         if self.tail_input.is_empty() {
@@ -819,6 +822,21 @@ mod tests {
     }
 
     #[test]
+    fn process_mismatched_lengths_returns_error() {
+        let mut convolver = TwoStageFFTConvolver::<f32>::default();
+        let ir = vec![0.5; 10000];
+        convolver.init(64, 4096, &ir).unwrap();
+
+        let input = vec![1.0_f32; 64];
+        let mut output = vec![0.0_f32; 128];
+        let result = convolver.process(&input, &mut output);
+        assert!(matches!(
+            result.unwrap_err(),
+            FFTConvolverError::InputOutputLengthMismatch
+        ));
+    }
+
+    #[test]
     fn test_short_ir_degenerate() {
         // IR shorter than head block — should behave like plain FFTConvolver
         let ir = vec![0.5, 0.3, 0.2, 0.1];
@@ -843,6 +861,57 @@ mod tests {
                 i,
                 output_uniform[i],
                 output_two_stage[i]
+            );
+        }
+    }
+
+    #[test]
+    fn test_small_head_block_size() {
+        // head_block_size=1 (rounds to 1); ensures no off-by-one in buffering
+        let ir = vec![0.5_f32, 0.3, 0.2, 0.1];
+        let mut convolver = TwoStageFFTConvolver::<f32>::default();
+        convolver.init(1, 16, &ir).unwrap();
+        assert_eq!(convolver.head_block_size, 1);
+
+        let mut input = vec![0.0_f32; 16];
+        input[0] = 1.0;
+        let mut output = vec![0.0_f32; 16];
+        convolver.process(&input, &mut output).unwrap();
+
+        assert!((output[0] - 0.5).abs() < 1e-5);
+        assert!((output[1] - 0.3).abs() < 1e-5);
+        assert!((output[2] - 0.2).abs() < 1e-5);
+        assert!((output[3] - 0.1).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_large_ir_equivalence() {
+        // Long IR — all three convolver stages active; compare against uniform convolver
+        let ir_len = 16384_usize;
+        let mut ir = vec![0.0_f32; ir_len];
+        ir[0] = 1.0; // identity
+
+        let mut uniform = FFTConvolver::<f32>::default();
+        uniform.init(512, &ir).unwrap();
+
+        let tail_block_size = compute_tail_block_size(512, ir_len);
+        let mut two_stage = TwoStageFFTConvolver::<f32>::default();
+        two_stage.init(512, tail_block_size, &ir).unwrap();
+
+        let input: Vec<f32> = (0..2048).map(|i| (i as f32 * 0.01).sin()).collect();
+        let mut out_uniform = vec![0.0_f32; 2048];
+        let mut out_two_stage = vec![0.0_f32; 2048];
+
+        uniform.process(&input, &mut out_uniform).unwrap();
+        two_stage.process(&input, &mut out_two_stage).unwrap();
+
+        for i in 0..input.len() {
+            assert!(
+                (out_uniform[i] - out_two_stage[i]).abs() < 1e-3,
+                "Mismatch at {}: uniform={}, two_stage={}",
+                i,
+                out_uniform[i],
+                out_two_stage[i]
             );
         }
     }

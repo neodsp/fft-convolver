@@ -22,6 +22,8 @@ pub enum FFTConvolverError {
     BlockSizeZero,
     #[error("impulse response exceeds configured capacity")]
     ImpulseResponseExceedsCapacity,
+    #[error("input and output buffers must have the same length")]
+    InputOutputLengthMismatch,
     #[error("error in fft: {0}")]
     Fft(#[from] FftError),
 }
@@ -246,16 +248,18 @@ impl<F: FftNum> FFTConvolver<F> {
         self.input_buffer.fill(F::zero());
         self.input_buffer_fill = 0;
         self.current = 0;
+        for segment in &mut self.segments {
+            segment.fill(Complex::zero());
+        }
 
         Ok(())
     }
 
     /// Convolves the input samples with the impulse response and outputs the result
     ///
-    /// This is a real-time safe operation that performs no allocations. The input and
-    /// output buffers can be of any length. Internal buffering handles arbitrary sizes
-    /// and ensures the output is always properly aligned with the input (zero latency
-    /// except for processing time).
+    /// This is a real-time safe operation that performs no allocations. Internal buffering
+    /// handles arbitrary sizes and ensures the output is always properly aligned with the
+    /// input (zero latency except for processing time).
     ///
     /// If the convolver has no active impulse response, the output is filled with zeros.
     ///
@@ -266,6 +270,7 @@ impl<F: FftNum> FFTConvolver<F> {
     ///
     /// # Returns
     ///
+    /// Returns `InputOutputLengthMismatch` if `input` and `output` have different lengths.
     /// Returns `Fft` error if an FFT operation fails.
     ///
     /// # Example
@@ -283,6 +288,10 @@ impl<F: FftNum> FFTConvolver<F> {
     /// ```
     #[nonblocking]
     pub fn process(&mut self, input: &[F], output: &mut [F]) -> Result<(), FFTConvolverError> {
+        if input.len() != output.len() {
+            return Err(FFTConvolverError::InputOutputLengthMismatch);
+        }
+
         if self.active_seg_count == 0 {
             output.fill(F::zero());
             return Ok(());
@@ -744,6 +753,21 @@ mod tests {
     }
 
     #[test]
+    fn process_mismatched_lengths_returns_error() {
+        let mut convolver = FFTConvolver::<f32>::default();
+        let ir = vec![1., 0., 0., 0.];
+        convolver.init(4, &ir).unwrap();
+
+        let input = vec![1.0; 4];
+        let mut output = vec![0.0; 8];
+        let result = convolver.process(&input, &mut output);
+        assert!(matches!(
+            result.unwrap_err(),
+            FFTConvolverError::InputOutputLengthMismatch
+        ));
+    }
+
+    #[test]
     fn reinit_with_empty_ir_produces_silence() {
         let long_ir = vec![0.5_f32; 1000];
         let block_size = 4;
@@ -762,6 +786,51 @@ mod tests {
                 "Expected silence at index {}, got {}",
                 i,
                 sample
+            );
+        }
+    }
+
+    #[test]
+    fn test_block_size_one() {
+        let mut convolver = FFTConvolver::<f32>::default();
+        let ir = vec![0.5_f32, 0.3, 0.2, 0.1];
+        convolver.init(1, &ir).unwrap();
+        assert_eq!(convolver.block_size, 1);
+
+        let mut input = vec![0.0_f32; 16];
+        input[0] = 1.0;
+        let mut output = vec![0.0_f32; 16];
+        convolver.process(&input, &mut output).unwrap();
+
+        assert!((output[0] - 0.5).abs() < 1e-5);
+        assert!((output[1] - 0.3).abs() < 1e-5);
+        assert!((output[2] - 0.2).abs() < 1e-5);
+        assert!((output[3] - 0.1).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_large_ir() {
+        // IR longer than a single block; verify output matches expectations over many segments
+        let ir_len = 8192_usize;
+        let block_size = 512;
+
+        let mut ir = vec![0.0_f32; ir_len];
+        ir[0] = 1.0; // identity
+
+        let mut convolver = FFTConvolver::<f32>::default();
+        convolver.init(block_size, &ir).unwrap();
+
+        let input: Vec<f32> = (0..ir_len).map(|i| i as f32 * 0.001).collect();
+        let mut output = vec![0.0_f32; ir_len];
+        convolver.process(&input, &mut output).unwrap();
+
+        for i in 0..ir_len {
+            assert!(
+                (output[i] - input[i]).abs() < 1e-4,
+                "Mismatch at {}: input={}, output={}",
+                i,
+                input[i],
+                output[i]
             );
         }
     }

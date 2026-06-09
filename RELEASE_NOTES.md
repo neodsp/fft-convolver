@@ -10,7 +10,13 @@
 
 - **Stale buffer data on re-initialization**: Calling `init()` on an already-initialized convolver now clears all internal state, preventing leftover data from a previous session from appearing in the output.
 
-## Improvements
+- **`process()` now returns an error on mismatched buffer lengths**: Passing `input` and `output` slices of different lengths previously caused a panic. It now returns `FFTConvolverError::InputOutputLengthMismatch`.
+
+- **Stale segment history after `set_response()`**: The internal FFT'd input history (`segments[]`) was not cleared when calling `set_response()`, leaving residual state that could affect subsequent output. It is now fully zeroed alongside the other buffers.
+
+- **Inefficient loop unrolling in `sum()`**: The 4×-unrolled loop processed only ¾ of the aligned elements. Results were always correct but the unrolling did less work than intended.
+
+## Chores
 
 - **Minimum Rust version**: Updated from 1.85 to 1.87.
 
