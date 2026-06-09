@@ -1,4 +1,4 @@
-name: 🧹 Safety Checks
+name: Safety Checks
 
 on:
   push:
@@ -11,7 +11,7 @@ env:
 
 jobs:
   sanitizers:
-    name: 🩸 Leak and 🔍 Address Sanitizers
+    name: Leak and Address Sanitizers
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +41,7 @@ jobs:
           RUSTFLAGS: "-Z sanitizer=leak"
 
   miri:
-    name: 🔮 Miri UB Checker
+    name: Miri UB Checker
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -1,4 +1,4 @@
-name: 🧰 Compatibility
+name: Compatibility
 
 on:
   push:
@@ -13,7 +13,7 @@ env:
 
 jobs:
   nightly:
-    name: 🌙 Nightly Rust
+    name: Nightly Rust
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
       - run: cargo test --locked --all-features --all-targets --workspace
 
   update:
-    name: 🔄 Latest Dependencies
+    name: Latest Dependencies
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

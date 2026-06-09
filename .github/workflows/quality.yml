@@ -1,4 +1,4 @@
-name: 🛡️ Quality Checks
+name: Quality Checks
 
 on:
   push:
@@ -11,7 +11,7 @@ env:
 
 jobs:
   cargo-fmt:
-    name: 📝 Code Format
+    name: Code Format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
       - run: cargo fmt --check
 
   taplo-fmt:
-    name: 📄 TOML Format
+    name: TOML Format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +29,7 @@ jobs:
       - run: taplo fmt --check
 
   clippy:
-    name: 📎 Clippy
+    name: Clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
       - run: RUSTFLAGS="-D warnings" cargo clippy
 
   doc:
-    name: 📚 Documentation
+    name: Documentation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +47,7 @@ jobs:
       - run: RUSTDOCFLAGS="-D warnings" cargo doc --locked --document-private-items
 
   semver:
-    name: 🏷️ Semver Checks
+    name: Semver Checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +55,7 @@ jobs:
       - uses: obi1kenobi/cargo-semver-checks-action@v2
 
   hack:
-    name: 🧩 Feature Matrix
+    name: Feature Matrix
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,7 +64,7 @@ jobs:
       - run: cargo hack --feature-powerset check
 
   msrv:
-    name: 🏗️ MSRV Check
+    name: MSRV Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
