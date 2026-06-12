@@ -18,7 +18,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - run: |
           # to get the symbolizer for debug symbol resolution
-          sudo apt install llvm
+          sudo apt install llvm libasound2-dev libpulse-dev pkg-config cmake
           # to fix buggy leak analyzer:
           # https://github.com/japaric/rust-san#unrealiable-leaksanitizer
           # ensure there's a profile.dev section
