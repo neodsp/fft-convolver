@@ -51,4 +51,5 @@ jobs:
         with:
           toolchain: ${{ env.NIGHTLY }}
           components: miri
+      - run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
       - run: cargo miri test --lib --bins --tests
