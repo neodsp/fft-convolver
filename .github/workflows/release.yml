@@ -32,6 +32,9 @@ jobs:
           fi
           echo "Version verified: $TAG_VERSION"
 
+      - name: Install system dependencies
+        run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
+
       - name: Run tests
         run: cargo test --all-features
 

@@ -36,6 +36,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
       - run: RUSTFLAGS="-D warnings" cargo clippy
 
   doc:
@@ -44,6 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
       - run: RUSTDOCFLAGS="-D warnings" cargo doc --locked --document-private-items
 
   semver:
@@ -52,6 +54,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
       - uses: obi1kenobi/cargo-semver-checks-action@v2
 
   hack:
@@ -60,6 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
       - uses: taiki-e/install-action@cargo-hack
       - run: cargo hack --feature-powerset check
 
@@ -71,4 +75,5 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.87.0
+      - run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
       - run: cargo check --all-features
