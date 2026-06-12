@@ -19,6 +19,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Install ALSA dev (Linux only)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y libasound2-dev
       - run: cargo test --locked --all-features --all-targets --workspace
         env:
           RTSAN_ENABLE: 1
