@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
-      - run: sudo apt-get install -y libasound2-dev
+      - run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
       - run: cargo test --locked --all-features --all-targets --workspace
 
   update:
@@ -27,6 +27,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@beta
-      - run: sudo apt-get install -y libasound2-dev
+      - run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
       - run: cargo update
       - run: RUSTFLAGS="-D deprecated" cargo test --locked --all-features --all-targets --workspace
