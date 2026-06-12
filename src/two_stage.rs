@@ -370,7 +370,7 @@ impl<F: FftNum> TwoStageFFTConvolver<F> {
 
             // Process tail0 incrementally (every head_block_size samples)
             if !self.tail_precalculated0.is_empty()
-                && self.tail_input_fill % self.head_block_size == 0
+                && self.tail_input_fill.is_multiple_of(self.head_block_size)
             {
                 let block_offset = self.tail_input_fill - self.head_block_size;
                 self.processing_buffer[..self.head_block_size].copy_from_slice(
