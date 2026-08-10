@@ -74,15 +74,17 @@ Average cost of one `process()` call, 512-sample buffer:
 | 65 536 | 55.66 µs | 22.87 µs | **2.4×** |
 | 131 072 | 113.53 µs | 26.97 µs | **4.2×** |
 
-The average hides the spike. Median and 99th percentile of one callback, 512-sample buffer and a 262 144-sample response, in µs:
+The average hides the spike. Below is the spike factor: the 99th percentile call time divided by the median, so 1.0 means every callback costs the same and 10.0 means the worst callback takes ten times as long as a typical one. 256-sample buffer:
 
-| | p50 | p99 |
-|---|---|---|
-| `FFTConvolver` | 236 | 363 |
-| `TwoStageFFTConvolver` | 39 | 400 |
-| `ThreadedFFTConvolver` | 38 | 88 |
+| IR length | `FFTConvolver` | `TwoStageFFTConvolver` | `ThreadedFFTConvolver` |
+|---|---|---|---|
+| 65 536 | 1.7 | 10.1 | 2.2 |
+| 131 072 | 1.4 | 11.0 | 2.4 |
+| 262 144 | 1.4 | 18.2 | 2.3 |
 
-`TwoStageFFTConvolver`'s p99 is the algorithm and reproduces run after run. What is left on the other two moves around between runs, because it is the operating system scheduling a normal-priority thread. The gap widens with channel count, since every channel reaches its tail block boundary on the same callback.
+`TwoStageFFTConvolver`'s spike is the algorithm and reproduces run after run. What is left on the other two moves around between runs, because it is the operating system scheduling a normal-priority thread. The gap widens with channel count, since every channel reaches its tail block boundary on the same callback.
+
+At very small buffers (64 samples and below) the ratio gets noisier without meaning much more: the typical call there is only a few microseconds, so a scheduling blip of a few tens of microseconds reads as a large multiple of a tiny number. Absolute times, not the ratio, are what matter at that end; see `cargo run --release --example jitter`.
 
 Thanks to [@orottier](https://github.com/orottier) for raising this in [web-audio-api-rs#620](https://github.com/orottier/web-audio-api-rs/issues/620).
 
