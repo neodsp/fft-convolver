@@ -37,7 +37,7 @@ All three produce the same output. They differ in how the work is distributed.
 
 **`TwoStageFFTConvolver`** adds a large tail block on top of a small head block, which is several times cheaper on average for long responses. The catch is that one call in every `tail_block_size / buffer_size` convolves the whole tail at once and costs far more than its neighbours. Choose it for offline rendering, where it is the fastest correct option, for swapping the impulse response at runtime, and anywhere you cannot spawn a thread.
 
-**`ThreadedFFTConvolver`** splits the response the same way but hands the tail to a worker thread, so the expensive call never lands on the audio thread. Choose it for a long response in a real-time callback, where the CPU budget is set by the worst callback rather than the average one. It has no `set_response()`, and offline it is slower than `TwoStageFFTConvolver`, because waiting for the worker costs more than it saves when there is no stream to keep up with.
+**`ThreadedFFTConvolver`** splits the response the same way but hands the tail to a worker thread, so the expensive call never lands on the audio thread. Choose it for a long response in a real-time callback, where the CPU budget is set by the worst callback rather than the average one. This matters most for multi-channel signals: with `TwoStageFFTConvolver`, every channel at the same buffer size hits its tail block boundary on the same callback, so the spike scales with channel count even though the typical call does not. It has no `set_response()`, and offline it is slower than `TwoStageFFTConvolver`, because waiting for the worker costs more than it saves when there is no stream to keep up with.
 
 ## Examples
 
@@ -49,7 +49,7 @@ Each one starts with what it is good for and what it is not, so you can pick by 
 | `two_stage` | `TwoStageFFTConvolver` | offline rendering; swapping the response at runtime; no threads |
 | `threaded` | `ThreadedFFTConvolver` | long responses on an audio thread, at a steady cost per callback |
 | `thread_priority` | `ThreadedFFTConvolver` | the same, with a real-time priority on the worker |
-| `custom_thread` | `ThreadedFFTConvolver` | many convolvers sharing one thread you set up yourself |
+| `custom_thread` | `ThreadedFFTConvolver` | multi-channel signals: one thread serving every channel's tail, instead of one thread each |
 
 ```sh
 cargo run --release --example basic

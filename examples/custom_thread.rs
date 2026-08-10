@@ -1,10 +1,13 @@
 //! `ThreadedFFTConvolver` on a thread you own, serving several channels.
 //!
 //! Good for:
+//! - multi-channel signals with a long impulse response. Every channel hits
+//!   its tail block boundary on the same callback, so `TwoStageFFTConvolver`'s
+//!   spike scales with channel count even though its typical call does not;
+//!   spreading the tails over one worker thread avoids that entirely
 //! - running many convolvers without one thread each: `init()` spawns a thread
 //!   per instance, which is right for one and wasteful for eight
 //! - placing the work yourself, on a thread you have already configured
-//! - anywhere you would rather own the thread than have one spawned for you
 //!
 //! Not for: a single convolver, where `init()` or `init_with_setup()` does the
 //! same thing with less code. See the `threaded` and `thread_priority`
@@ -89,6 +92,10 @@ fn main() {
     let callback_period = Duration::from_secs_f64(BUFFER_SIZE as f64 / SAMPLE_RATE);
 
     for _ in 0..CALLBACKS {
+        // All channels processed in the same callback: with
+        // TwoStageFFTConvolver their tail-block spikes would land together
+        // too. Here the tails are off on the worker thread, so this loop only
+        // ever pays the steady head-and-transition cost.
         for (convolver, output) in convolvers.iter_mut().zip(&mut outputs) {
             convolver.process(&input, output).expect("matching lengths");
         }
