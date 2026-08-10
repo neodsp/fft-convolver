@@ -86,20 +86,20 @@ fn main() -> Result<(), Error> {
             num_frames: BLOCK_SIZE,
         },
         move |_input, mut output| {
-            let num_frames = output.num_frames() as usize;
+            let num_frames = output.num_frames();
             let num_ch = output.num_channels() as usize;
 
-            for ch in 0..num_ch {
+            for (ch, convolver) in convolvers.iter_mut().enumerate() {
                 let in_ch = input_block.channel_mut(ch as u16);
-                for f in 0..num_frames {
+                for (f, sample) in in_ch.iter_mut().enumerate().take(num_frames) {
                     let idx = (pos + f) * num_ch + ch;
-                    in_ch[f] = if idx < audio_data.len() {
+                    *sample = if idx < audio_data.len() {
                         audio_data[idx]
                     } else {
                         0.0
                     };
                 }
-                convolvers[ch]
+                convolver
                     .process(
                         input_block.channel(ch as u16),
                         output_block.channel_mut(ch as u16),

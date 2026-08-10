@@ -25,6 +25,19 @@ use rtsan_standalone::nonblocking;
 ///   "unpredictable" operations like allocations, locking, API calls, etc. are
 ///   performed during processing (all necessary allocations and preparations take
 ///   place during initialization).
+///
+/// # Cost is not evenly distributed
+///
+/// [`process`](Self::process) is allocation-free but not constant-time. The head
+/// runs on every call, while the tail convolution runs on only one call out of
+/// every `tail_block_size / buffer_size`, and that call is much more expensive
+/// than its neighbours. This lowers the *average* cost per call but not the
+/// *peak* cost.
+///
+/// On an audio thread, where the CPU budget is set by the worst callback rather
+/// than the average one, prefer [`FFTConvolver`] if you need steady per-callback
+/// cost, especially at block sizes of 256 samples and above. For offline
+/// rendering, where only the total matters, this convolver is the better choice.
 #[derive(Clone, Debug)]
 pub struct TwoStageFFTConvolver<F: FftNum> {
     ir_len: usize,

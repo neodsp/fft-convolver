@@ -77,8 +77,8 @@ mod tests {
 
         // Create a simple test signal
         let mut input = vec![0.0; size];
-        for i in 0..size {
-            input[i] = ((i * 7 + 13) % 50) as f32 / 25.0 - 1.0;
+        for (i, sample) in input.iter_mut().enumerate() {
+            *sample = ((i * 7 + 13) % 50) as f32 / 25.0 - 1.0;
         }
         let original = input.clone();
         let mut freq = vec![Complex::<f32>::zero(); size / 2 + 1];
@@ -101,9 +101,8 @@ mod tests {
         // Create a pure sine wave at bin 10
         let freq_bin = 10;
         let mut input = vec![0.0; size];
-        for i in 0..size {
-            input[i] =
-                (2.0 * std::f32::consts::PI * freq_bin as f32 * i as f32 / size as f32).sin();
+        for (i, sample) in input.iter_mut().enumerate() {
+            *sample = (2.0 * std::f32::consts::PI * freq_bin as f32 * i as f32 / size as f32).sin();
         }
 
         let mut freq = vec![Complex::<f32>::zero(); size / 2 + 1];

@@ -36,8 +36,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      # Only needed for the playback-example feature, which --all-features enables.
       - run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
-      - run: RUSTFLAGS="-D warnings" cargo clippy
+      - run: RUSTFLAGS="-D warnings" cargo clippy --locked --all-features --all-targets --workspace
 
   doc:
     name: Documentation
@@ -45,7 +46,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
       - run: RUSTDOCFLAGS="-D warnings" cargo doc --locked --document-private-items
 
   semver:
@@ -54,7 +54,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
       - uses: obi1kenobi/cargo-semver-checks-action@v2
 
   hack:
@@ -63,9 +62,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      # Only needed for the playback-example feature, which --all-features enables.
       - run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
       - uses: taiki-e/install-action@cargo-hack
-      - run: cargo hack --feature-powerset check
+      - run: cargo hack --feature-powerset check --locked
 
   msrv:
     name: MSRV Check
@@ -75,5 +75,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.87.0
+      # Only needed for the playback-example feature, which --all-features enables.
       - run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
-      - run: cargo check --all-features
+      - run: cargo check --locked --all-features
+
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-audit
+      - run: cargo audit

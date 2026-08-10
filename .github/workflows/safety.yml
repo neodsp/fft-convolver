@@ -18,7 +18,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - run: |
           # to get the symbolizer for debug symbol resolution
-          sudo apt install llvm libasound2-dev libpulse-dev pkg-config cmake
+          sudo apt install llvm
           # to fix buggy leak analyzer:
           # https://github.com/japaric/rust-san#unrealiable-leaksanitizer
           # ensure there's a profile.dev section
@@ -31,14 +31,38 @@ jobs:
           # now set opt-level to 1
           sed -i '/^\s*\[profile.dev\]/a opt-level = 1' Cargo.toml
           cat Cargo.toml
-      - run: cargo test --lib --tests --target x86_64-unknown-linux-gnu
+      - run: cargo test --locked --lib --tests --target x86_64-unknown-linux-gnu
         env:
           ASAN_OPTIONS: "detect_odr_violation=0:detect_leaks=0"
           RUSTFLAGS: "-Z sanitizer=address"
-      - run: cargo test --target x86_64-unknown-linux-gnu
+      - run: cargo test --locked --target x86_64-unknown-linux-gnu
         env:
           LSAN_OPTIONS: "suppressions=lsan-suppressions.txt"
           RUSTFLAGS: "-Z sanitizer=leak"
+
+  rtsan:
+    name: Realtime Sanitizer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --locked --lib
+        env:
+          RTSAN_ENABLE: "1"
+
+  thread-sanitizer:
+    name: Thread Sanitizer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+      # build-std so that the standard library is instrumented too, otherwise
+      # the thread parking behind the worker handoff is invisible to TSan.
+      - run: cargo test --locked -Z build-std --lib --target x86_64-unknown-linux-gnu
+        env:
+          RUSTFLAGS: "-Z sanitizer=thread"
 
   miri:
     name: Miri UB Checker
@@ -51,5 +75,4 @@ jobs:
         with:
           toolchain: ${{ env.NIGHTLY }}
           components: miri
-      - run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
-      - run: cargo miri test --lib --bins --tests
+      - run: cargo miri test --locked --lib --bins --tests

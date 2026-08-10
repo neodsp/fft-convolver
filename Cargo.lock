@@ -96,6 +96,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "audio_thread_priority"
+version = "0.37.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e58c7a923538aa84eef9947d81924fb9f34d7db6004e179218ab57a7bb7700b6"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "log",
+ "mach2",
+ "windows-sys",
+]
+
+[[package]]
 name = "audioadapter"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -351,13 +364,15 @@ checksum = "9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6"
 
 [[package]]
 name = "fft-convolver"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "audio-blocks",
  "audio-file",
  "audio-host",
+ "audio_thread_priority",
  "criterion",
  "realfft",
+ "rtrb",
  "rtsan-standalone",
  "thiserror",
 ]
@@ -534,6 +549,15 @@ name = "log"
 version = "0.4.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "953f07c43838f8e6f9758cab68bf5bed85465e7587ebe0b823f1bcd81978ad3a"
+
+[[package]]
+name = "mach2"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d640282b302c0bb0a2a8e0233ead9035e3bed871f0b7e81fe4a1ec829765db44"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "memchr"

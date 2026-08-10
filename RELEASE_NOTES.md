@@ -1,23 +1,19 @@
-# Release Notes
+## Unreleased
 
-## New Features
+### Breaking Changes
 
-- **`TwoStageFFTConvolver`**: A new convolver using non-uniform block sizes — a small "head" block for low-latency processing of the early IR and a large "tail" block for efficient processing of the late IR. Significantly faster than `FFTConvolver` for long impulse responses (2.5× at 65k samples, 4.4× at 131k samples). Use `init_default(block_size, &ir)` to let the library compute the optimal tail block size automatically, or `init(head_block_size, tail_block_size, &ir)` for full control.
+- **`FFTConvolverError` gained a `WorkerSpawn` variant** for a worker thread that could not be started, and is now `#[non_exhaustive]`. Matches on it need a wildcard arm; in exchange, later variants will not be breaking.
 
-- **`Debug` derive on public types**: `FFTConvolver` and `TwoStageFFTConvolver` now derive `Debug`.
+### New Features
 
-## Bug Fixes
+- **`ThreadedFFTConvolver`**: A two-stage convolver that runs the tail stage on a worker thread. `TwoStageFFTConvolver` computes the whole tail on the call that completes a tail block, which lowers the average cost per call but not the peak; this one keeps the head and transition stages on the audio thread and hands the tail block over instead, so the audio thread's cost stays steady. The handoff uses lock-free SPSC ring buffers and a wake based on the standard library's thread parking, never a mutex. The audio thread never waits for the worker: if a deadline is missed the tail contributes silence for that block period, `missed_blocks()` counts it, and the output is exact again afterwards. Use `sync()` for deterministic offline rendering.
 
-- **Stale buffer data on re-initialization**: Calling `init()` on an already-initialized convolver now clears all internal state, preventing leftover data from a previous session from appearing in the output.
+- **`ThreadedFFTConvolver::init_with_setup`**: Runs a closure on the worker thread before it starts convolving, which is where a real-time priority has to be requested from on Linux and macOS. No priority is set by default, since the right value depends on what the host gave the audio callback.
 
-- **`process()` now returns an error on mismatched buffer lengths**: Passing `input` and `output` slices of different lengths previously caused a panic. It now returns `FFTConvolverError::InputOutputLengthMismatch`.
+- **`ThreadedFFTConvolver::split`**: Returns the convolver together with its `TailWorker` instead of spawning a thread, for callers who want to place the work themselves. `TailWorker::run` takes over a thread until the convolver is dropped, while `run_pending` does the work that is ready without blocking, so one thread can serve the tails of several convolvers.
 
-- **Stale segment history after `set_response()`**: The internal FFT'd input history (`segments[]`) was not cleared when calling `set_response()`, leaving residual state that could affect subsequent output. It is now fully zeroed alongside the other buffers.
+### Chores
 
-- **Inefficient loop unrolling in `sum()`**: The 4×-unrolled loop processed only ¾ of the aligned elements. Results were always correct but the unrolling did less work than intended.
+- **`playback-example` feature**: The `highpass_playback` example and its `audio-host`, `audio-file` and `audio-blocks` dependencies now sit behind an off-by-default feature. Nothing else in the crate used them, so `cargo test` no longer needs the ALSA and PulseAudio development headers, and most CI jobs no longer install them.
 
-## Chores
-
-- **Minimum Rust version**: Updated from 1.85 to 1.87.
-
-- **Dependency updates**: All dependencies updated to their latest versions.
+- **Examples**: One per way of using the crate, each stating at the top what it is good for: `basic`, `two_stage`, `threaded`, `thread_priority` and `custom_thread`, plus `jitter` for measuring the per-callback cost of all three convolvers.

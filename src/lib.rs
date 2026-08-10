@@ -2,6 +2,7 @@
 #![doc = include_str!("../README.md")]
 
 mod fft;
+mod threaded;
 mod two_stage;
 mod utilities;
 use crate::fft::Fft;
@@ -13,10 +14,14 @@ use realfft::num_traits::Zero;
 use realfft::{FftError, FftNum};
 use rtsan_standalone::nonblocking;
 use thiserror::Error;
+pub use threaded::{TailWorker, ThreadedFFTConvolver};
 pub use two_stage::TwoStageFFTConvolver;
 pub use utilities::compute_tail_block_size;
 
+/// Marked `#[non_exhaustive]` so that a future variant is not a breaking
+/// change; match with a wildcard arm.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum FFTConvolverError {
     #[error("block size is not allowed to be zero")]
     BlockSizeZero,
@@ -26,6 +31,8 @@ pub enum FFTConvolverError {
     InputOutputLengthMismatch,
     #[error("error in fft: {0}")]
     Fft(#[from] FftError),
+    #[error("could not spawn the convolution worker thread: {0}")]
+    WorkerSpawn(#[from] std::io::Error),
 }
 
 /// FFTConvolver
