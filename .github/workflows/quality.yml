@@ -46,7 +46,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      # No --all-features: the crate has no feature-gated items, so this builds
+      # the same docs docs.rs does, which also builds without features here.
       - run: RUSTDOCFLAGS="-D warnings" cargo doc --locked --document-private-items
+
+  readme:
+    name: README Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # The README is generated from the crate docs in lib.rs, so it goes stale
+      # as soon as those change without a `cargo rdme` run.
+      - run: cargo install --locked cargo-rdme
+      - run: cargo rdme --check
 
   semver:
     name: Semver Checks
@@ -65,7 +78,10 @@ jobs:
       # Only needed for the playback-example feature, which --all-features enables.
       - run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
       - uses: taiki-e/install-action@cargo-hack
-      - run: cargo hack --feature-powerset check --locked
+      # --all-targets, because playback-example gates an example rather than
+      # anything in the library, so without it the feature side of the powerset
+      # checks nothing that the featureless side does not.
+      - run: cargo hack --feature-powerset check --locked --all-targets
 
   msrv:
     name: MSRV Check
@@ -75,9 +91,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.87.0
-      # Only needed for the playback-example feature, which --all-features enables.
-      - run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
-      - run: cargo check --locked --all-features
+      # --all-targets so that the tests, benches and examples have to build as
+      # well, but deliberately not --all-features: playback-example pulls in
+      # audio-file, which declares a higher MSRV than this crate does. The
+      # example is excluded from --all-targets along with the feature it needs.
+      - run: cargo check --locked --all-targets
 
   audit:
     name: Security Audit
