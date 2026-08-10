@@ -17,7 +17,8 @@ rust-version = "1.87"
 [features]
 # Enables the `highpass_playback` example, which plays through a real audio
 # device. Off by default, because its dependencies need the ALSA and PulseAudio
-# development headers on Linux and nothing else in the crate uses them.
+# development headers on Linux and nothing else in the crate uses them. It also
+# needs a newer rustc than the `rust-version` above: `audio-file` asks for 1.88.
 playback-example = ["dep:audio-blocks", "dep:audio-file", "dep:audio-host"]
 
 [dependencies]
