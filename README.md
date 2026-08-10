@@ -63,14 +63,16 @@ cargo run --release --features playback-example --example highpass_playback
 
 ## Benchmarks
 
-Results on AMD Ryzen 9900X (CachyOS, x86-64). Average cost of one `process()` call, 512-sample buffer:
+All numbers below are from one machine, an AMD Ryzen 7 7840U laptop, so the two tables are comparable with each other. Absolute times will differ on yours; run `cargo bench` and `cargo run --release --example jitter` to get numbers for your own hardware, ideally the one you plan to deploy to.
+
+Average cost of one `process()` call, 512-sample buffer:
 
 | IR length | `FFTConvolver` | `TwoStageFFTConvolver` | speedup |
 |---|---|---|---|
-| 4 096 | 3.70 µs | 5.87 µs | −1.6× (slower) |
-| 16 384 | 10.93 µs | 10.03 µs | **1.1×** |
-| 65 536 | 40.82 µs | 16.13 µs | **2.5×** |
-| 131 072 | 81.8 µs | 18.6 µs | **4.4×** |
+| 4 096 | 5.37 µs | 8.59 µs | −1.6× (slower) |
+| 16 384 | 15.38 µs | 13.89 µs | **1.1×** |
+| 65 536 | 55.66 µs | 22.87 µs | **2.4×** |
+| 131 072 | 113.53 µs | 26.97 µs | **4.2×** |
 
 The average hides the spike. Median and 99th percentile of one callback, 512-sample buffer and a 262 144-sample response, in µs:
 
@@ -81,8 +83,6 @@ The average hides the spike. Median and 99th percentile of one callback, 512-sam
 | `ThreadedFFTConvolver` | 38 | 88 |
 
 `TwoStageFFTConvolver`'s p99 is the algorithm and reproduces run after run. What is left on the other two moves around between runs, because it is the operating system scheduling a normal-priority thread. The gap widens with channel count, since every channel reaches its tail block boundary on the same callback.
-
-Reproduce with `cargo bench` and `cargo run --release --example jitter`.
 
 Thanks to [@orottier](https://github.com/orottier) for raising this in [web-audio-api-rs#620](https://github.com/orottier/web-audio-api-rs/issues/620).
 
