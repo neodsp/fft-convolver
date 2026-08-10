@@ -14,30 +14,15 @@ rust-version = "1.87"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[features]
-# Enables the `highpass_playback` example, which plays through a real audio
-# device. Off by default, because its dependencies need the ALSA and PulseAudio
-# development headers on Linux and nothing else in the crate uses them. It also
-# needs a newer rustc than the `rust-version` above: `audio-file` asks for 1.88.
-playback-example = ["dep:audio-blocks", "dep:audio-file", "dep:audio-host"]
-
 [dependencies]
 realfft = "3.5.0"
 thiserror = "2.0"
 rtsan-standalone = "0.3.0"
 rtrb = "0.3.4"
-# Only used by the `highpass_playback` example, see the feature above.
-audio-blocks = { version = "0.7", optional = true }
-audio-file = { version = "0.4", optional = true }
-audio-host = { version = "0.1", optional = true }
 
 [dev-dependencies]
 criterion = "0.8"
 audio_thread_priority = { version = "0.37.0", default-features = false }
-
-[[example]]
-name = "highpass_playback"
-required-features = ["playback-example"]
 
 [[bench]]
 name = "convolver"

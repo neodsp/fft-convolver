@@ -81,15 +81,9 @@ by reading the top of the file.
 cargo run --release --example basic
 ```
 
-Two more that are not about setting a convolver up: `jitter` measures the
-per-callback cost of all three so you can decide on your own hardware, and
-`highpass_playback` runs a highpass FIR against a real audio device. The
-playback one needs the ALSA and PulseAudio development headers on Linux, so
-it sits behind a feature:
-
-```sh
-cargo run --release --features playback-example --example highpass_playback
-```
+One more that is not about setting a convolver up: `jitter` measures the
+per-callback cost of all three, so you can decide between them on your own
+hardware.
 
 ## Benchmarks
 

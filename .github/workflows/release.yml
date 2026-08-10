@@ -32,15 +32,12 @@ jobs:
           fi
           echo "Version verified: $TAG_VERSION"
 
-      - name: Install system dependencies
-        run: sudo apt-get install -y libasound2-dev libpulse-dev pkg-config cmake
-
       - name: Run tests
-        run: cargo test --locked --all-features --all-targets
+        run: cargo test --locked --all-targets
 
       # --all-targets excludes doctests, so they need their own run.
       - name: Run doctests
-        run: cargo test --locked --all-features --doc
+        run: cargo test --locked --doc
 
       - name: Publish to crates.io
         run: cargo publish --locked --token ${{ secrets.CARGO_REGISTRY_TOKEN }}

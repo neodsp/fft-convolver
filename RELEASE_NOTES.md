@@ -14,6 +14,8 @@
 
 ### Chores
 
-- **`playback-example` feature**: The `highpass_playback` example and its `audio-host`, `audio-file` and `audio-blocks` dependencies now sit behind an off-by-default feature. Nothing else in the crate used them, so `cargo test` no longer needs the ALSA and PulseAudio development headers, and most CI jobs no longer install them.
+- **No optional dependencies, no features**: The `highpass_playback` example is gone, and with it the `audio-host`, `audio-file` and `audio-blocks` dependencies. It could only ever be compiled in CI, never run, since a runner has no audio device, and what it showed about this crate the other examples already cover. Building and testing now needs nothing beyond the crate itself, in particular not the ALSA and PulseAudio development headers.
 
 - **Examples**: One per way of using the crate, each stating at the top what it is good for: `basic`, `two_stage`, `threaded`, `thread_priority` and `custom_thread`, plus `jitter` for measuring the per-callback cost of all three convolvers.
+
+- **README generated from the crate docs**: The crate documentation now lives in `lib.rs` and the README is produced from it with [`cargo rdme`](https://crates.io/crates/cargo-rdme), so its code samples are compiled and run as doctests and its type references link to the API docs. A CI job fails if the two drift apart.
