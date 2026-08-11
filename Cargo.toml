@@ -15,14 +15,14 @@ rust-version = "1.87"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-realfft = "3.5.0"
+realfft = "3.5"
 thiserror = "2.0"
-rtsan-standalone = "0.3.0"
+rtsan-standalone = "0.3"
 rtrb = "0.3.4"
 
 [dev-dependencies]
 criterion = "0.8"
-audio_thread_priority = { version = "0.37.0", default-features = false }
+audio_thread_priority = { version = "0.37", default-features = false }
 
 [[bench]]
 name = "convolver"
